@@ -1,6 +1,7 @@
 {
   "name": "devicebase",
-  "version": "2026.5.13",
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.1.2",
   "description": "DeviceBase JavaScript SDK for remote device automation",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
@@ -22,7 +23,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && cp src/cjs-package.json dist/cjs/package.json",
+    "build": "npm run build:esm && npm run build:cjs && cp src/cjs-package.json dist/cjs/package.json",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "test": "vitest run",
