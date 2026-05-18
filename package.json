@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.1.2",
   "description": "DeviceBase JavaScript SDK for remote device automation",
-  "author": "Devicebase (https://devicebase.cn)",
+  "author": "Devicebase Team (https://devicebase.cn)",
   "license": "MIT",
   "homepage": "https://github.com/devicebase/js-devicebase#readme",
   "repository": {
