@@ -1,9 +1,10 @@
 /* eslint-disable no-console */
-import { DeviceBaseClient } from 'devicebase'
+import process from 'node:process'
+import { DeviceBaseClient } from '../src/index.js'
 
 const client = new DeviceBaseClient({
-  apiKey: 'your-api-key',
-  serial: 'device-serial-number',
+  apiKey: process.env.API_KEY,
+  serial: process.env.SERIAL!,
 })
 
 async function main() {

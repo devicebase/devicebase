@@ -3,4 +3,5 @@ dist/
 *.tgz
 coverage/
 .DS_Store
+*.local
 CHANGELOG.md

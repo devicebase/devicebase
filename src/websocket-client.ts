@@ -55,7 +55,9 @@ export class MinicapClient {
 
           const frameSize = header.readUInt32BE(0)
           const frameData = await receiveBinary(ws, frameSize)
-          yield Buffer.from(frameData.subarray(0, frameSize))
+          // Yield raw Uint8Array instead of Buffer.from() to maintain type compatibility
+          // with Node 22's stricter generic ArrayBuffer constraints
+          yield frameData.subarray(0, frameSize)
         }
         catch {
           break
@@ -225,7 +227,9 @@ function waitForOpen(ws: WebSocket): Promise<void> {
 
 function receiveBinary(ws: WebSocket, size: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
+    // Accumulate binary data as Uint8Array chunks to avoid type conflicts with Buffer.concat()
+    // in Node 22 where Buffer extends Uint8Array<ArrayBuffer> with stricter generic constraints
+    const chunks: Uint8Array[] = []
     let received = 0
 
     function cleanup() {
@@ -235,27 +239,29 @@ function receiveBinary(ws: WebSocket, size: number): Promise<Buffer> {
     }
 
     function onMessage(event: MessageEvent) {
-      let buf: Buffer
+      let buf: Uint8Array
       if (event.data instanceof ArrayBuffer) {
-        buf = Buffer.from(event.data)
+        buf = new Uint8Array(event.data)
       }
       else if (ArrayBuffer.isView(event.data)) {
-        buf = Buffer.from(event.data.buffer as ArrayBuffer)
+        // Preserve byte offset and length when wrapping ArrayBuffer views
+        buf = new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength)
       }
       else {
-        buf = Buffer.from(event.data as ArrayBuffer)
+        buf = new Uint8Array(event.data as ArrayBuffer)
       }
       chunks.push(buf)
       received += buf.length
       if (received >= size) {
         cleanup()
-        resolve(Buffer.concat(chunks))
+        resolve(Buffer.from(concatUint8Arrays(chunks, received)))
       }
     }
 
     function onClose() {
       cleanup()
-      resolve(Buffer.concat(chunks))
+      // Return accumulated data as Buffer when connection closes
+      resolve(Buffer.from(concatUint8Arrays(chunks, received)))
     }
 
     function onError(err: Event) {
@@ -267,4 +273,22 @@ function receiveBinary(ws: WebSocket, size: number): Promise<Buffer> {
     ws.addEventListener('close', onClose, { once: true })
     ws.addEventListener('error', onError, { once: true })
   })
+}
+
+/**
+ * Manually concatenate multiple Uint8Array chunks into a single array.
+ * This approach avoids Buffer.concat() type incompatibility issues with Node 22
+ * where SharedArrayBuffer vs ArrayBuffer generic constraints create type conflicts.
+ * @param chunks - Array of Uint8Array fragments to concatenate
+ * @param totalLength - Total byte length of all chunks combined
+ * @returns A single Uint8Array containing all chunk data
+ */
+function concatUint8Arrays(chunks: readonly Uint8Array[], totalLength: number): Uint8Array {
+  const output = new Uint8Array(totalLength)
+  let offset = 0
+  for (const chunk of chunks) {
+    output.set(chunk, offset)
+    offset += chunk.length
+  }
+  return output
 }
