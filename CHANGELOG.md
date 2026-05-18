@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
 
 ### :tada: New Features
 
-- Initial DeviceBase JavaScript SDK implementation [`09035c3`](https://github.com/devicebase/js-devicebase/commit/09035c35880275f56e85975cbbbcf6b4aad788b3) by @Richie
+- Initial DeviceBase JavaScript SDK implementation [`09035c3`](https://github.com/devicebase/js-devicebase/commit/09035c35880275f56e85975cbbbcf6b4aad788b3) by @RichieOne
 
 ### :memo: Documentation Changes
 

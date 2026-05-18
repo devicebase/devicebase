@@ -15,8 +15,8 @@ importers:
         specifier: ^22.0.0
         version: 22.0.0
       auto-changelog-plus:
-        specifier: ^1.2.4
-        version: 1.2.4
+        specifier: ^1.3.0
+        version: 1.3.0
       eslint:
         specifier: ^10.3.0
         version: 10.4.0
@@ -848,8 +848,8 @@ packages:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
 
-  auto-changelog-plus@1.2.4:
-    resolution: {integrity: sha512-CmfrB/Gv1KJW3e+lTv+hhXxYNTzRv40AA9BR0/czmlN3w4bR0QwqiQ37FBCkqo31UwbVaJhdKX8pYhcaIjWnPw==}
+  auto-changelog-plus@1.3.0:
+    resolution: {integrity: sha512-mciBBNBpxVguAxCQWmgFH/nFEay0fi4kgS7q+wfF2OMCGdqzuNPo/OrkncP5xtisvjbj7HUE3d29mhAmk8y6cg==}
     hasBin: true
 
   auto-changelog@2.5.1:
@@ -2804,7 +2804,7 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  auto-changelog-plus@1.2.4:
+  auto-changelog-plus@1.3.0:
     dependencies:
       auto-changelog: 2.5.1
 
