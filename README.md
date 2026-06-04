@@ -1,8 +1,14 @@
-# Devicebase JavaScript SDK
+# Devicebase
 
 [![npm version](https://img.shields.io/npm/v/devicebase.svg)](https://www.npmjs.com/package/devicebase)
 
-JavaScript/TypeScript SDK for [DeviceBase](https://github.com/devicebase) — remote Android, HarmonyOS, and iOS device automation via HTTP API.
+JavaScript/TypeScript SDK & CLI for [DeviceBase](https://github.com/devicebase) — remote Android, HarmonyOS, and iOS device automation via HTTP API.
+
+## Features
+
+- **CLI** — Cross-platform command-line tool for device control
+- **SDK** — Full-featured TypeScript client for programmatic device automation
+- **WebSocket** — Real-time screen streaming (Minicap) and touch control (Minitouch)
 
 ## Requirements
 
@@ -10,11 +16,116 @@ JavaScript/TypeScript SDK for [DeviceBase](https://github.com/devicebase) — re
 
 ## Installation
 
+### As a CLI tool (global install)
+
+```bash
+npm install -g devicebase
+```
+
+### As an SDK dependency
+
 ```bash
 npm install devicebase
 ```
 
-## Quick Start
+## CLI Usage
+
+Set environment variables before using the CLI:
+
+```bash
+export DEVICEBASE_API_KEY=your_api_key
+export DEVICEBASE_BASE_URL=https://api.devicebase.cn  # optional, defaults to this
+```
+
+Most commands require the `-s <serial>` flag to specify the target device. The `list-devices` command is an exception.
+
+### Device Management
+
+```bash
+# List all devices (no -s flag required)
+devicebase list-devices
+
+# Filter by keyword (brand/model/serial/name)
+devicebase list-devices --keyword "iPhone"
+
+# Filter by state (busy/free/offline)
+devicebase list-devices --state free
+
+# Combine filters with limit
+devicebase list-devices --keyword "Samsung" --state busy --limit 20
+```
+
+### Touch Interactions
+
+```bash
+# Tap at coordinates
+devicebase -s <serial> tap 100,200
+
+# Double tap
+devicebase -s <serial> double-tap 100,200
+
+# Long press
+devicebase -s <serial> long-press 100,200
+
+# Swipe from (x1,y1) to (x2,y2)
+devicebase -s <serial> swipe 100,200,300,400
+```
+
+### Navigation
+
+```bash
+# Press back button
+devicebase -s <serial> back
+
+# Press home button
+devicebase -s <serial> home
+```
+
+### App Management
+
+```bash
+# Launch an app by name
+devicebase -s <serial> launch-app com.example.app
+
+# Get the current foreground app
+devicebase -s <serial> current-app
+```
+
+### Text Input
+
+```bash
+# Input text
+devicebase -s <serial> input "Hello World"
+
+# Clear text field
+devicebase -s <serial> clear-text
+```
+
+### Device Information
+
+```bash
+# Get device info
+devicebase -s <serial> device-info
+
+# Dump UI hierarchy (accessibility tree)
+devicebase -s <serial> dump-hierarchy
+
+# Take a screenshot (outputs to stdout)
+devicebase -s <serial> screenshot
+
+# Save screenshot to a file
+devicebase -s <serial> screenshot -o screenshot.jpg
+```
+
+### Global Flags
+
+| Flag        | Short | Description          |
+| ----------- | ----- | -------------------- |
+| `--serial`  | `-s`  | Device serial number |
+| `--help`    | `-h`  | Show help            |
+| `--version` |       | Show version         |
+
+## SDK Usage
 
 ```typescript
 import { DeviceBaseClient } from 'devicebase'
@@ -67,7 +178,7 @@ const client = new DeviceBaseClient({
 
 Environment variables:
 
-- `DEVICEBASE_API_KEY` — JWT API key for authentication
+- `DEVICEBASE_API_KEY` — API key for authentication
 - `DEVICEBASE_BASE_URL` — API base URL (default: `https://api.devicebase.cn`)
 
 ## WebSocket Streaming
@@ -132,6 +243,10 @@ await minitouch.close()
 | `minicapClient()` | `MinicapClient` | Create screen streaming WebSocket client |
 | `minitouchClient()` | `MinitouchClient` | Create touch control WebSocket client |
 | `streamMinicap()` | `AsyncGenerator<Buffer>` | Stream JPEG frames |
+
+## Development
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and contribution workflow.
 
 ## License
 

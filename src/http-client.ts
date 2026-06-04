@@ -5,7 +5,6 @@ import {
   createDeviceInfo,
   createHierarchyInfo,
   createOperationResult,
-
 } from './models.js'
 
 // --- Errors ---
@@ -215,10 +214,10 @@ export class DeviceBaseHttpClient {
     return response.arrayBuffer()
   }
 
-  async getScreenshotPost(serial: string): Promise<ArrayBuffer> {
-    const url = `${this.baseUrl}/v1/screen/${serial}`
+  async downloadScreenshot(serial: string): Promise<ArrayBuffer> {
+    const url = `${this.baseUrl}/v1/screenshot/${serial}`
     const response = await fetch(url, {
-      method: 'POST',
+      method: 'GET',
       headers: this.authHeaders(),
       signal: AbortSignal.timeout(this.timeout),
     })
@@ -228,10 +227,32 @@ export class DeviceBaseHttpClient {
     return response.arrayBuffer()
   }
 
-  async downloadScreenshot(serial: string): Promise<ArrayBuffer> {
-    const url = `${this.baseUrl}/v1/screenshot/${serial}`
+  // List Devices
+
+  async listDevices(params?: {
+    keyword?: string
+    state?: string
+    limit?: number
+  }): Promise<Record<string, unknown>> {
+    const searchParams = new URLSearchParams()
+    if (params?.keyword)
+      searchParams.set('keyword', params.keyword)
+    if (params?.state)
+      searchParams.set('state', params.state)
+    if (params?.limit !== undefined && params.limit > 0)
+      searchParams.set('limit', String(params.limit))
+
+    const qs = searchParams.toString()
+    const path = `/v1/devices${qs ? `?${qs}` : ''}`
+    return this.request('GET', path)
+  }
+
+  // Screenshot raw bytes (for CLI)
+
+  async screenshotRaw(serial: string): Promise<ArrayBuffer> {
+    const url = `${this.baseUrl}/v1/screen/${serial}`
     const response = await fetch(url, {
-      method: 'GET',
+      method: 'POST',
       headers: this.authHeaders(),
       signal: AbortSignal.timeout(this.timeout),
     })

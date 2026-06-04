@@ -3,24 +3,26 @@
   "type": "module",
   "version": "0.1.0",
   "packageManager": "pnpm@11.1.2",
-  "description": "DeviceBase JavaScript SDK for remote device automation",
+  "description": "Devicebase SDK & CLI for remote Android, HarmonyOS, and iOS device control via HTTP API",
   "author": "Devicebase Team (https://devicebase.cn)",
   "license": "MIT",
-  "homepage": "https://github.com/devicebase/js-devicebase#readme",
+  "homepage": "https://github.com/devicebase/devicebase#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/devicebase/js-devicebase.git"
+    "url": "git+https://github.com/devicebase/devicebase.git"
   },
   "bugs": {
-    "url": "https://github.com/devicebase/js-devicebase/issues"
+    "url": "https://github.com/devicebase/devicebase/issues"
   },
   "keywords": [
     "devicebase",
     "device-automation",
     "android",
     "ios",
+    "harmonyos",
     "remote-control",
-    "testing"
+    "testing",
+    "cli"
   ],
   "exports": {
     ".": {
@@ -33,6 +35,9 @@
   "main": "./dist/devicebase.umd.js",
   "module": "./dist/devicebase.es.js",
   "types": "./dist/types/index.d.ts",
+  "bin": {
+    "devicebase": "./dist/bin/index.js"
+  },
   "files": [
     "dist"
   ],
@@ -42,13 +47,24 @@
   "scripts": {
     "dev": "vite-node examples/basic-usage.ts",
     "build": "vite build && tsc -p tsconfig.lib.json",
+    "build:bin": "vite build --config vite.config.bin.ts",
+    "build:all": "pnpm build && pnpm build:bin",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "version": "auto-changelog-plus -p && git add CHANGELOG.md",
     "postversion": "git push --tags && git push",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build:all"
+  },
+  "auto-changelog-plus": {
+    "authorMap": {
+      "Richie": "RichieMess",
+      "Cell": "Lruihao"
+    }
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
@@ -59,11 +75,5 @@
     "vite": "^8.0.13",
     "vite-node": "^6.0.0",
     "vitest": "^3.2.4"
-  },
-  "auto-changelog-plus": {
-    "authorMap": {
-      "Richie": "RichieOne",
-      "Cell": "Lruihao"
-    }
   }
 }

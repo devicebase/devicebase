@@ -18,22 +18,22 @@ All notable changes to this project will be documented in this file.
 
 ### :tada: New Features
 
-- Initial DeviceBase JavaScript SDK implementation [`09035c3`](https://github.com/devicebase/js-devicebase/commit/09035c35880275f56e85975cbbbcf6b4aad788b3) by @RichieOne
+- Initial DeviceBase JavaScript SDK implementation [`09035c3`](https://github.com/devicebase/devicebase/commit/09035c35880275f56e85975cbbbcf6b4aad788b3) by @RichieOne
 
 ### :memo: Documentation Changes
 
-- Add CONTRIBUTING guide and update README title [`68581f1`](https://github.com/devicebase/js-devicebase/commit/68581f1c7110186359cf06c1b030064707a870d9) by @Lruihao
-- Add MIT License file [`13e1f67`](https://github.com/devicebase/js-devicebase/commit/13e1f67fea02a9af67e303f0baeaa13f5589a933) by @Lruihao
+- Add CONTRIBUTING guide and update README title [`68581f1`](https://github.com/devicebase/devicebase/commit/68581f1c7110186359cf06c1b030064707a870d9) by @Lruihao
+- Add MIT License file [`13e1f67`](https://github.com/devicebase/devicebase/commit/13e1f67fea02a9af67e303f0baeaa13f5589a933) by @Lruihao
 
 ### :wrench: Chores And Housekeeping
 
-- **Deps**: Bump pnpm/action-setup from 5 to 6 (#3) [`ced0cfc`](https://github.com/devicebase/js-devicebase/commit/ced0cfc017878db7c16058ea73bde69f6c70ef7f) by @dependabot
-- **Deps**: Bump actions/upload-pages-artifact from 4 to 5 (#2) [`dabf494`](https://github.com/devicebase/js-devicebase/commit/dabf494ded5526cf6d7e653d25779671e022c4fa) by @dependabot
-- **Deps**: Bump softprops/action-gh-release from 2 to 3 (#1) [`9d4f99d`](https://github.com/devicebase/js-devicebase/commit/9d4f99d89fedc129a0729848e0bae8257724c6f4) by @dependabot
-- Add ESLint and Vite support [`5ef0315`](https://github.com/devicebase/js-devicebase/commit/5ef0315e569e04f8caa35d1ba217761e704fd76d) by @Lruihao
-- Add pnpm workspace configuration to allow esbuild builds [`96f945e`](https://github.com/devicebase/js-devicebase/commit/96f945e558283905a236ded5b0652ce1b13abec2) by @Lruihao
-- Add GitHub Actions workflows for deployment, publishing, and release management [`79abac3`](https://github.com/devicebase/js-devicebase/commit/79abac316c347bfae75934561c65db6c907d79d1) by @Lruihao
-- Add .env file and update example to use environment variables; modify deploy paths and improve websocket handling for Node 22 compatibility [`3633e27`](https://github.com/devicebase/js-devicebase/commit/3633e27066a46a5382b22f88d9a4baa56cda958a) by @Lruihao
-- Add output globals for Rollup configuration [`f994de9`](https://github.com/devicebase/js-devicebase/commit/f994de9760014e669a35403b2a962997cae06c8f) by @Lruihao
-- Remove unused cjs-package.json file [`4d7cb6f`](https://github.com/devicebase/js-devicebase/commit/4d7cb6f22c9a86490d3766c0deb5504dd097a745) by @Lruihao
-- Add .npmrc file with registry and release message configuration [`a9a0c54`](https://github.com/devicebase/js-devicebase/commit/a9a0c54ae95b03d3258b7b59d324aef0bae82607) by @Lruihao
+- **Deps**: Bump pnpm/action-setup from 5 to 6 (#3) [`ced0cfc`](https://github.com/devicebase/devicebase/commit/ced0cfc017878db7c16058ea73bde69f6c70ef7f) by @dependabot
+- **Deps**: Bump actions/upload-pages-artifact from 4 to 5 (#2) [`dabf494`](https://github.com/devicebase/devicebase/commit/dabf494ded5526cf6d7e653d25779671e022c4fa) by @dependabot
+- **Deps**: Bump softprops/action-gh-release from 2 to 3 (#1) [`9d4f99d`](https://github.com/devicebase/devicebase/commit/9d4f99d89fedc129a0729848e0bae8257724c6f4) by @dependabot
+- Add ESLint and Vite support [`5ef0315`](https://github.com/devicebase/devicebase/commit/5ef0315e569e04f8caa35d1ba217761e704fd76d) by @Lruihao
+- Add pnpm workspace configuration to allow esbuild builds [`96f945e`](https://github.com/devicebase/devicebase/commit/96f945e558283905a236ded5b0652ce1b13abec2) by @Lruihao
+- Add GitHub Actions workflows for deployment, publishing, and release management [`79abac3`](https://github.com/devicebase/devicebase/commit/79abac316c347bfae75934561c65db6c907d79d1) by @Lruihao
+- Add .env file and update example to use environment variables; modify deploy paths and improve websocket handling for Node 22 compatibility [`3633e27`](https://github.com/devicebase/devicebase/commit/3633e27066a46a5382b22f88d9a4baa56cda958a) by @Lruihao
+- Add output globals for Rollup configuration [`f994de9`](https://github.com/devicebase/devicebase/commit/f994de9760014e669a35403b2a962997cae06c8f) by @Lruihao
+- Remove unused cjs-package.json file [`4d7cb6f`](https://github.com/devicebase/devicebase/commit/4d7cb6f22c9a86490d3766c0deb5504dd097a745) by @Lruihao
+- Add .npmrc file with registry and release message configuration [`a9a0c54`](https://github.com/devicebase/devicebase/commit/a9a0c54ae95b03d3258b7b59d324aef0bae82607) by @Lruihao
