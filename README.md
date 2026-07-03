@@ -16,7 +16,15 @@ JavaScript/TypeScript SDK & CLI for [DeviceBase](https://github.com/devicebase) 
 
 ## Installation
 
-### As a CLI tool (global install)
+### As a CLI tool
+
+Recommended — run directly with `npx` (no install needed):
+
+```bash
+npx devicebase
+```
+
+Or install globally:
 
 ```bash
 npm install -g devicebase
@@ -43,78 +51,78 @@ Most commands require the `-s <serial>` flag to specify the target device. The `
 
 ```bash
 # List all devices (no -s flag required)
-devicebase list-devices
+npx devicebase list-devices
 
 # Filter by keyword (brand/model/serial/name)
-devicebase list-devices --keyword "iPhone"
+npx devicebase list-devices --keyword "iPhone"
 
 # Filter by state (busy/free/offline)
-devicebase list-devices --state free
+npx devicebase list-devices --state free
 
 # Combine filters with limit
-devicebase list-devices --keyword "Samsung" --state busy --limit 20
+npx devicebase list-devices --keyword "Samsung" --state busy --limit 20
 ```
 
 ### Touch Interactions
 
 ```bash
 # Tap at coordinates
-devicebase -s <serial> tap 100,200
+npx devicebase -s <serial> tap 100,200
 
 # Double tap
-devicebase -s <serial> double-tap 100,200
+npx devicebase -s <serial> double-tap 100,200
 
 # Long press
-devicebase -s <serial> long-press 100,200
+npx devicebase -s <serial> long-press 100,200
 
 # Swipe from (x1,y1) to (x2,y2)
-devicebase -s <serial> swipe 100,200,300,400
+npx devicebase -s <serial> swipe 100,200,300,400
 ```
 
 ### Navigation
 
 ```bash
 # Press back button
-devicebase -s <serial> back
+npx devicebase -s <serial> back
 
 # Press home button
-devicebase -s <serial> home
+npx devicebase -s <serial> home
 ```
 
 ### App Management
 
 ```bash
 # Launch an app by name
-devicebase -s <serial> launch-app com.example.app
+npx devicebase -s <serial> launch-app com.example.app
 
 # Get the current foreground app
-devicebase -s <serial> current-app
+npx devicebase -s <serial> current-app
 ```
 
 ### Text Input
 
 ```bash
 # Input text
-devicebase -s <serial> input "Hello World"
+npx devicebase -s <serial> input "Hello World"
 
 # Clear text field
-devicebase -s <serial> clear-text
+npx devicebase -s <serial> clear-text
 ```
 
 ### Device Information
 
 ```bash
 # Get device info
-devicebase -s <serial> device-info
+npx devicebase -s <serial> device-info
 
 # Dump UI hierarchy (accessibility tree)
-devicebase -s <serial> dump-hierarchy
+npx devicebase -s <serial> dump-hierarchy
 
 # Take a screenshot (outputs to stdout)
-devicebase -s <serial> screenshot
+npx devicebase -s <serial> screenshot
 
 # Save screenshot to a file
-devicebase -s <serial> screenshot -o screenshot.jpg
+npx devicebase -s <serial> screenshot -o screenshot.jpg
 ```
 
 ### Global Flags
@@ -224,25 +232,25 @@ await minitouch.close()
 
 ### `DeviceBaseClient`
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getDeviceInfo()` | `Promise<DeviceInfo>` | Get device status and hardware info |
-| `tap(x, y)` | `Promise<OperationResult>` | Single tap at coordinates |
-| `doubleTap(x, y)` | `Promise<OperationResult>` | Double tap at coordinates |
-| `longPress(x, y)` | `Promise<OperationResult>` | Long press at coordinates |
-| `swipe(x1, y1, x2, y2)` | `Promise<OperationResult>` | Swipe gesture |
-| `back()` | `Promise<OperationResult>` | Press back button |
-| `home()` | `Promise<OperationResult>` | Press home button |
-| `launchApp(appName)` | `Promise<OperationResult>` | Launch app by package name |
-| `getCurrentApp()` | `Promise<AppInfo>` | Get foreground app info |
-| `inputText(text)` | `Promise<OperationResult>` | Type text into focused field |
-| `clearText()` | `Promise<OperationResult>` | Clear text in focused field |
-| `dumpHierarchy()` | `Promise<HierarchyInfo>` | Get UI element tree |
-| `getScreenshot()` | `Promise<ArrayBuffer>` | Screenshot as JPEG bytes |
-| `downloadScreenshot()` | `Promise<ArrayBuffer>` | Download screenshot as attachment |
-| `minicapClient()` | `MinicapClient` | Create screen streaming WebSocket client |
-| `minitouchClient()` | `MinitouchClient` | Create touch control WebSocket client |
-| `streamMinicap()` | `AsyncGenerator<Buffer>` | Stream JPEG frames |
+| Method                  | Returns                    | Description                              |
+| ----------------------- | -------------------------- | ---------------------------------------- |
+| `getDeviceInfo()`       | `Promise<DeviceInfo>`      | Get device status and hardware info      |
+| `tap(x, y)`             | `Promise<OperationResult>` | Single tap at coordinates                |
+| `doubleTap(x, y)`       | `Promise<OperationResult>` | Double tap at coordinates                |
+| `longPress(x, y)`       | `Promise<OperationResult>` | Long press at coordinates                |
+| `swipe(x1, y1, x2, y2)` | `Promise<OperationResult>` | Swipe gesture                            |
+| `back()`                | `Promise<OperationResult>` | Press back button                        |
+| `home()`                | `Promise<OperationResult>` | Press home button                        |
+| `launchApp(appName)`    | `Promise<OperationResult>` | Launch app by package name               |
+| `getCurrentApp()`       | `Promise<AppInfo>`         | Get foreground app info                  |
+| `inputText(text)`       | `Promise<OperationResult>` | Type text into focused field             |
+| `clearText()`           | `Promise<OperationResult>` | Clear text in focused field              |
+| `dumpHierarchy()`       | `Promise<HierarchyInfo>`   | Get UI element tree                      |
+| `getScreenshot()`       | `Promise<ArrayBuffer>`     | Screenshot as JPEG bytes                 |
+| `downloadScreenshot()`  | `Promise<ArrayBuffer>`     | Download screenshot as attachment        |
+| `minicapClient()`       | `MinicapClient`            | Create screen streaming WebSocket client |
+| `minitouchClient()`     | `MinitouchClient`          | Create touch control WebSocket client    |
+| `streamMinicap()`       | `AsyncGenerator<Buffer>`   | Stream JPEG frames                       |
 
 ## Development
 

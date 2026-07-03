@@ -46,6 +46,7 @@
   },
   "scripts": {
     "dev": "vite-node examples/basic-usage.ts",
+    "dev:bin": "vite-node src/cli/index.ts",
     "build": "vite build && tsc -p tsconfig.lib.json",
     "build:bin": "vite build --config vite.config.bin.ts",
     "build:all": "pnpm build && pnpm build:bin",
