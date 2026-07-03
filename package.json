@@ -1,7 +1,7 @@
 {
   "name": "devicebase",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packageManager": "pnpm@11.1.2",
   "description": "Devicebase SDK & CLI for remote Android, HarmonyOS, and iOS device control via HTTP API",
   "author": "Devicebase Team (https://devicebase.cn)",
