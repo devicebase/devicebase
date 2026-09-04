@@ -101,12 +101,29 @@ export class DeviceBaseHttpClient {
     )
   }
 
+  /** Build a full URL from a path and optional query params (null/undefined/empty values are skipped). */
+  private buildUrl(path: string, query?: Record<string, unknown>): string {
+    if (!query) {
+      return `${this.baseUrl}${path}`
+    }
+    const searchParams = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null || value === '') {
+        continue
+      }
+      searchParams.set(key, String(value))
+    }
+    const qs = searchParams.toString()
+    return `${this.baseUrl}${path}${qs ? `?${qs}` : ''}`
+  }
+
   private async request(
     method: string,
     path: string,
     body?: Record<string, unknown>,
+    query?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const url = `${this.baseUrl}${path}`
+    const url = this.buildUrl(path, query)
     const response = await fetch(url, {
       method,
       headers: this.authHeaders(),
@@ -233,6 +250,7 @@ export class DeviceBaseHttpClient {
     keyword?: string
     state?: string
     limit?: number
+    type?: string
   }): Promise<Record<string, unknown>> {
     const searchParams = new URLSearchParams()
     if (params?.keyword)
@@ -241,15 +259,34 @@ export class DeviceBaseHttpClient {
       searchParams.set('state', params.state)
     if (params?.limit !== undefined && params.limit > 0)
       searchParams.set('limit', String(params.limit))
+    if (params?.type)
+      searchParams.set('type', params.type)
 
     const qs = searchParams.toString()
     const path = `/v1/devices${qs ? `?${qs}` : ''}`
     return this.request('GET', path)
   }
 
-  // Screenshot raw bytes (for CLI)
+  /**
+   * Generic JSON request entry (HTTP method + path + optional body/query),
+   * used by the CLI platform command groups (mobile stop-app/bash/install,
+   * browser and computer). Auth, timeout and error mapping are identical to
+   * the typed methods above.
+   */
+  async requestJson(
+    method: string,
+    path: string,
+    options: {
+      body?: Record<string, unknown>
+      query?: Record<string, unknown>
+    } = {},
+  ): Promise<Record<string, unknown>> {
+    return this.request(method, path, options.body, options.query)
+  }
 
-  async screenshotRaw(serial: string): Promise<ArrayBuffer> {
+  // Screenshot raw bytes via POST (for CLI)
+
+  async getScreenshotPost(serial: string): Promise<ArrayBuffer> {
     const url = `${this.baseUrl}/v1/screen/${serial}`
     const response = await fetch(url, {
       method: 'POST',
