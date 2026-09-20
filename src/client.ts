@@ -6,10 +6,8 @@ import type {
   OperationResult,
 } from './models.js'
 import process from 'node:process'
-import {
-  AuthenticationError,
-  DeviceBaseHttpClient,
-} from './http-client.js'
+import { AuthenticationError } from './errors.js'
+import { DeviceBaseHttpClient } from './http-client.js'
 import { MinicapClient, MinitouchClient } from './websocket-client.js'
 
 export interface DeviceBaseClientConfig {
@@ -19,6 +17,14 @@ export interface DeviceBaseClientConfig {
   timeout?: number
 }
 
+/**
+ * A serial-bound facade over `DeviceBaseHttpClient` for one **mobile** device.
+ *
+ * Every call fills in the serial, so an Android/HarmonyOS/iOS automation script
+ * never repeats it. For the browser and computer platforms, where a "device" is
+ * a single registered endpoint rather than a phone, use `DeviceBaseHttpClient`
+ * directly and pass the serialno per call.
+ */
 export class DeviceBaseClient {
   private readonly serial: string
   private readonly http: DeviceBaseHttpClient
@@ -90,6 +96,14 @@ export class DeviceBaseClient {
     return this.http.launchApp(this.serial, appName)
   }
 
+  async stopApp(appName: string): Promise<OperationResult> {
+    return this.http.stopApp(this.serial, appName)
+  }
+
+  async stopCurrentApp(): Promise<OperationResult> {
+    return this.http.stopCurrentApp(this.serial)
+  }
+
   async getCurrentApp(): Promise<AppInfo> {
     return this.http.getCurrentApp(this.serial)
   }
@@ -104,20 +118,33 @@ export class DeviceBaseClient {
     return this.http.clearText(this.serial)
   }
 
+  // Shell
+
+  async bash(command: string): Promise<OperationResult> {
+    return this.http.bash(this.serial, command)
+  }
+
   // UI Hierarchy
 
   async dumpHierarchy(): Promise<HierarchyInfo> {
     return this.http.dumpHierarchy(this.serial)
   }
 
-  // Screenshots
+  // Install
 
-  async getScreenshot(): Promise<ArrayBuffer> {
-    return this.http.getScreenshot(this.serial)
+  async installApp(appPath: string): Promise<OperationResult> {
+    return this.http.installApp(this.serial, appPath)
   }
 
-  async downloadScreenshot(): Promise<ArrayBuffer> {
-    return this.http.downloadScreenshot(this.serial)
+  async installStatus(installId: string): Promise<OperationResult> {
+    return this.http.installStatus(this.serial, installId)
+  }
+
+  // Screenshots
+
+  /** Raw image bytes from `POST /v1/screen/{serial}` (the format is the server's choice — JPEG today). */
+  async getScreenshot(): Promise<ArrayBuffer> {
+    return this.http.getScreenshot(this.serial)
   }
 
   // WebSocket Clients

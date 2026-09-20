@@ -2,264 +2,168 @@ import type { OptionValues } from 'commander'
 import { Command } from 'commander'
 import {
   createClient,
+  printEnvelope,
+  readInputText,
+  requireArg,
   resolveSerial,
-  send,
 } from './helpers.js'
-
-/**
- * Browser platform commands — everything maps to the platform browser open
- * API: /api/browser/{serial}/{action...}, where `serial` is the registered
- * browser device UUID (see "devicebase list-devices --type browser").
- *
- * HTTP methods, body and query field names below are the contract shared
- * with the Go CLI and mirror the TestClaw service route source.
- */
+import { createScreenshotCommand } from './screenshot.js'
 
 export const BROWSER_GROUP = 'browser'
 
-const BROWSER_HINT = 'Hint: run "devicebase list-devices --type browser" to find the target browser device UUID'
-
-function browserSerial(cmd: Command): string {
-  return resolveSerial(cmd, BROWSER_HINT)
-}
-
-// --- Actions --------------------------------------------------------------
-
-function navigate(url: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/navigate`, { body: { url } }))
-}
-
-function refresh(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/refresh`))
-}
-
-function goBack(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/go_back`))
-}
-
-function goForward(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/go_forward`))
-}
-
-// Raw text insertion into the focused element (Input.insertText on the client).
-function inputText(text: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/input`, { body: { text } }))
-}
-
-function click(selector: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/click`, { body: { selector } }))
-}
-
-function fill(selector: string, text: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/fill`, { body: { selector, value: text } }))
-}
-
-function select(selector: string, value: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/select`, { body: { selector, value } }))
-}
-
-function text(selector: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('GET', `/api/browser/${serial}/text`, { query: { selector } }))
-}
-
-function attribute(selector: string, attributeName: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('GET', `/api/browser/${serial}/attribute`, { query: { selector, attribute: attributeName } }))
-}
-
-function exists(selector: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('GET', `/api/browser/${serial}/exists`, { query: { selector } }))
-}
-
-function execute(script: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/execute`, { body: { script } }))
-}
-
-function hotkey(keys: string[], _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/hotkey`, { body: { keys } }))
-}
-
-function state(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('GET', `/api/browser/${serial}/state`))
-}
-
-function tabs(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('GET', `/api/browser/${serial}/tabs`))
-}
-
-function tabOpen(url: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/tab/open`, { body: { url } }))
-}
-
-// tab close/switch id field is tab_id on the wire.
-function tabClose(tabId: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/tab/close`, { body: { tab_id: tabId } }))
-}
-
-function tabCloseAll(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/tab/close_all`))
-}
-
-function tabSwitch(tabId: string, _options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/tab/switch`, { body: { tab_id: tabId } }))
-}
-
-function launch(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/launch`))
-}
-
-function close(_options: OptionValues, cmd: Command): void {
-  const serial = browserSerial(cmd)
-  send(createClient().requestJson('POST', `/api/browser/${serial}/close`))
-}
-
-// --- Registration ---------------------------------------------------------
-
-export function registerBrowserCommands(parent: Command): Command {
+/**
+ * Browser platform group (Chrome/Chromium/Edge over CDP).
+ *
+ * Every action targets `POST/GET /api/browser/{serialno}/{action...}`. The
+ * serial is the platform `serialno` of a registered browser device — see
+ * `devicebase list-devices --type browser`.
+ */
+export function createBrowserCommand(): Command {
   const group = new Command(BROWSER_GROUP)
-  group
-    .description('Control a browser device via /api/browser/{serial} (serial is the registered browser device UUID)')
-    .option('-s, --serial <serial>', 'Browser device UUID')
-    .addCommand(
-      new Command('navigate')
-        .argument('<url>')
-        .description('Navigate to a URL')
-        .action(navigate),
-    )
-    .addCommand(
-      new Command('refresh')
-        .description('Refresh the current page')
-        .action(refresh),
-    )
-    .addCommand(
-      new Command('go-back')
-        .description('Go back in history')
-        .action(goBack),
-    )
-    .addCommand(
-      new Command('go-forward')
-        .description('Go forward in history')
-        .action(goForward),
-    )
-    .addCommand(
-      new Command('input')
-        .argument('<text>')
-        .description('Insert text into the focused element')
-        .action(inputText),
-    )
-    .addCommand(
-      new Command('click')
-        .argument('<selector>')
-        .description('Click the element matching the CSS selector')
-        .action(click),
-    )
-    .addCommand(
-      new Command('fill')
-        .argument('<selector>')
-        .argument('<text>')
-        .description('Fill the element matching the CSS selector with text')
-        .action(fill),
-    )
-    .addCommand(
-      new Command('select')
-        .argument('<selector>')
-        .argument('<value>')
-        .description('Select an option in the element matching the CSS selector')
-        .action(select),
-    )
-    .addCommand(
-      new Command('text')
-        .argument('<selector>')
-        .description('Get the text of the element matching the CSS selector')
-        .action(text),
-    )
-    .addCommand(
-      new Command('attribute')
-        .argument('<selector>')
-        .argument('<name>')
-        .description('Get an attribute value of the element matching the CSS selector')
-        .action(attribute),
-    )
-    .addCommand(
-      new Command('exists')
-        .argument('<selector>')
-        .description('Check whether an element matching the CSS selector exists')
-        .action(exists),
-    )
-    .addCommand(
-      new Command('execute')
-        .argument('<js>')
-        .description('Execute a JavaScript snippet in the page')
-        .action(execute),
-    )
-    .addCommand(
-      new Command('hotkey')
-        .argument('<keys...>')
-        .description('Send a keyboard shortcut, e.g. "hotkey ctrl shift t"')
-        .action(hotkey),
-    )
-    .addCommand(
-      new Command('state')
-        .description('Get the browser state (url, title, viewport, tab count)')
-        .action(state),
-    )
-    .addCommand(
-      new Command('tabs')
-        .description('List the open tabs')
-        .action(tabs),
-    )
-    .addCommand(
-      new Command('tab-open')
-        .argument('<url>')
-        .description('Open a new tab with the given URL')
-        .action(tabOpen),
-    )
-    .addCommand(
-      new Command('tab-close')
-        .argument('<id>')
-        .description('Close the tab with the given id')
-        .action(tabClose),
-    )
-    .addCommand(
-      new Command('tab-close-all')
-        .description('Close all tabs (a fresh blank tab is left open)')
-        .action(tabCloseAll),
-    )
-    .addCommand(
-      new Command('tab-switch')
-        .argument('<id>')
-        .description('Switch to the tab with the given id')
-        .action(tabSwitch),
-    )
-    .addCommand(
-      new Command('launch')
-        .description('Launch (start) the browser instance')
-        .action(launch),
-    )
-    .addCommand(
-      new Command('close')
-        .description('Close the browser instance')
-        .action(close),
-    )
-  parent.addCommand(group)
+    .description('Control a browser (Chrome/CDP) platform device')
+    .option('-s, --serialno <serialno>', 'Platform serialno (sn from device list)')
+
+  const commands: Command[] = [
+    new Command('navigate')
+      .argument('<url>')
+      .description('Navigate the browser to a URL')
+      .action(async (url: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserNavigate(resolveSerial(cmd, BROWSER_GROUP), requireArg(url, 'url')))
+      }),
+    new Command('refresh')
+      .description('Reload the current page')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserRefresh(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    new Command('go-back')
+      .description('Go back in the browser history')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserGoBack(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    new Command('go-forward')
+      .description('Go forward in the browser history')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserGoForward(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    new Command('input')
+      .argument('[text]')
+      .description('Insert text into the focused page element (reads stdin when omitted)')
+      .action(async (text: string | undefined, _options: OptionValues, cmd: Command) => {
+        const value = await readInputText(text, 'devicebase browser -s <serialno> input')
+        printEnvelope(await createClient().browserInput(resolveSerial(cmd, BROWSER_GROUP), value))
+      }),
+    new Command('click')
+      .argument('<selector>')
+      .description('Click the element matching a CSS selector')
+      .action(async (selector: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserClick(resolveSerial(cmd, BROWSER_GROUP), requireArg(selector, 'selector')))
+      }),
+    new Command('fill')
+      .argument('<selector>')
+      .argument('<text>')
+      .description('Clear the element matching a CSS selector and type into it')
+      .action(async (selector: string, text: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserFill(
+          resolveSerial(cmd, BROWSER_GROUP),
+          requireArg(selector, 'selector'),
+          requireArg(text, 'value'),
+        ))
+      }),
+    new Command('select')
+      .argument('<selector>')
+      .argument('<value>')
+      .description('Select an option inside the element matching a CSS selector')
+      .action(async (selector: string, value: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserSelect(
+          resolveSerial(cmd, BROWSER_GROUP),
+          requireArg(selector, 'selector'),
+          requireArg(value, 'value'),
+        ))
+      }),
+    new Command('text')
+      .argument('<selector>')
+      .description('Get the text content of an element')
+      .action(async (selector: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserText(resolveSerial(cmd, BROWSER_GROUP), requireArg(selector, 'selector')))
+      }),
+    new Command('attribute')
+      .argument('<selector>')
+      .argument('<name>')
+      .description('Get an attribute value of an element')
+      .action(async (selector: string, name: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserAttribute(
+          resolveSerial(cmd, BROWSER_GROUP),
+          requireArg(selector, 'selector'),
+          requireArg(name, 'attribute'),
+        ))
+      }),
+    new Command('exists')
+      .argument('<selector>')
+      .description('Report whether at least one element matches the selector')
+      .action(async (selector: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserExists(resolveSerial(cmd, BROWSER_GROUP), requireArg(selector, 'selector')))
+      }),
+    new Command('execute')
+      .argument('<js>')
+      .description('Evaluate JavaScript in the page (danger tier, same as shell access)')
+      .action(async (script: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserExecute(resolveSerial(cmd, BROWSER_GROUP), requireArg(script, 'script')))
+      }),
+    new Command('hotkey')
+      .argument('<keys...>')
+      .description('Press the given keys together, e.g. "hotkey Meta a"')
+      .action(async (keys: string[], _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserHotkey(resolveSerial(cmd, BROWSER_GROUP), keys))
+      }),
+    new Command('state')
+      .description('Show the browser state (url, title, viewport, tab count)')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserState(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    new Command('tabs')
+      .description('List the open browser tabs')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserTabs(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    new Command('tab-open')
+      .argument('<url>')
+      .description('Open a new tab and navigate it to the URL')
+      .action(async (url: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserTabOpen(resolveSerial(cmd, BROWSER_GROUP), requireArg(url, 'url')))
+      }),
+    new Command('tab-close')
+      .argument('<id>')
+      .description('Close the tab with the given id')
+      .action(async (tabId: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserTabClose(resolveSerial(cmd, BROWSER_GROUP), requireArg(tabId, 'tab_id')))
+      }),
+    new Command('tab-close-all')
+      .description('Close every tab and land on a fresh about:blank tab')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserTabCloseAll(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    new Command('tab-switch')
+      .argument('<id>')
+      .description('Focus the tab with the given id')
+      .action(async (tabId: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserTabSwitch(resolveSerial(cmd, BROWSER_GROUP), requireArg(tabId, 'tab_id')))
+      }),
+    new Command('launch')
+      .description('Launch the browser instance (start CDP)')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserLaunch(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    new Command('close')
+      .description('Close the browser instance (stop CDP)')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().browserClose(resolveSerial(cmd, BROWSER_GROUP)))
+      }),
+    createScreenshotCommand(BROWSER_GROUP),
+  ]
+
+  for (const command of commands) {
+    group.addCommand(command)
+  }
+
   return group
 }

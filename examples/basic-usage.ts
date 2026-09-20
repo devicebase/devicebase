@@ -41,10 +41,6 @@ async function main() {
   const hierarchy = await client.dumpHierarchy()
   console.log('Hierarchy:', hierarchy)
 
-  // Download screenshot as file
-  const download = await client.downloadScreenshot()
-  console.log('Download size:', download.byteLength, 'bytes')
-
   // Stream screen via WebSocket
   console.log('Streaming screen frames...')
   // eslint-disable-next-line no-unreachable-loop

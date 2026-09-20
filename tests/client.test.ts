@@ -230,16 +230,57 @@ describe('deviceBaseClient', () => {
       expect(result).toBeInstanceOf(ArrayBuffer)
     })
 
-    it('downloadScreenshot returns ArrayBuffer', async () => {
-      const fakeImage = new Uint8Array([0xFF]).buffer
+    it('getScreenshot POSTs to the screen endpoint', async () => {
+      const fakeImage = new Uint8Array([0xFF, 0xD8]).buffer
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         arrayBuffer: async () => fakeImage,
       })
 
-      const result = await client.downloadScreenshot()
-      expect(result).toBeInstanceOf(ArrayBuffer)
+      await client.getScreenshot()
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}/v1/screen/${SERIAL}`,
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
+
+    it('stopApp, stopCurrentApp, bash and install delegate to the http client', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: async () => '{}',
+      })
+
+      await client.stopApp('com.example.app')
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        `${BASE_URL}/v1/stop_app/${SERIAL}`,
+        expect.objectContaining({ body: JSON.stringify({ app_name: 'com.example.app' }) }),
+      )
+
+      await client.stopCurrentApp()
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        `${BASE_URL}/v1/stop_current_app/${SERIAL}`,
+        expect.anything(),
+      )
+
+      await client.bash('ls -la')
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        `${BASE_URL}/v1/bash/${SERIAL}`,
+        expect.objectContaining({ body: JSON.stringify({ command: 'ls -la' }) }),
+      )
+
+      await client.installApp('/tmp/app.apk')
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        `${BASE_URL}/v1/install_app/${SERIAL}`,
+        expect.objectContaining({ body: JSON.stringify({ app_path: '/tmp/app.apk' }) }),
+      )
+
+      await client.installStatus('install-42')
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        `${BASE_URL}/v1/install_status/${SERIAL}?install_id=install-42`,
+        expect.anything(),
+      )
     })
   })
 

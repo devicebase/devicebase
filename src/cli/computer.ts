@@ -1,238 +1,208 @@
 import type { OptionValues } from 'commander'
-import process from 'node:process'
-import { Command, Option } from 'commander'
+import type { MouseButton, ScrollDirection } from '../models.js'
+import { Command } from 'commander'
 import {
   createClient,
+  fail,
   parseBounds,
-  parseNumber,
+  parseIntegerToken,
   parsePoint,
+  printEnvelope,
+  requireArg,
   resolveSerial,
-  send,
 } from './helpers.js'
-
-/**
- * Computer platform commands — everything maps to the platform computer open
- * API: /api/computer/{serial}/{action...}, where `serial` is the registered
- * computer device id (see "devicebase list-devices --type computer").
- *
- * Coordinates are absolute screen pixels ("x,y" / "x1,y1,x2,y2"). HTTP
- * methods, body and query field names below are the contract shared with the
- * Go CLI and mirror the TestClaw service route source.
- */
+import { createScreenshotCommand } from './screenshot.js'
 
 export const COMPUTER_GROUP = 'computer'
 
-const COMPUTER_HINT = 'Hint: run "devicebase list-devices --type computer" to find the target computer device id'
+const BUTTON_CHOICES: readonly MouseButton[] = ['left', 'right', 'middle']
+const SCROLL_DIRECTIONS: readonly ScrollDirection[] = ['up', 'down', 'left', 'right']
 
-function computerSerial(cmd: Command): string {
-  return resolveSerial(cmd, COMPUTER_HINT)
-}
+/** Bounds for `computer wait`, in milliseconds (the route's documented ceiling). */
+const MIN_WAIT_MS = 1
+const MAX_WAIT_MS = 300_000
 
-// --- Actions --------------------------------------------------------------
+/** Bounds for `computer bash --timeout`, in seconds; 0 means "server default". */
+const MAX_BASH_TIMEOUT_SECONDS = 600
 
-function click(coords: string, options: { button?: string }, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  const p = parsePoint(coords)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/click`, {
-    body: { x: p.x, y: p.y, button: options.button ?? 'left' },
-  }))
-}
+/** Bounds for `computer long-click --seconds`; 0 means "driver default". */
+const MAX_LONG_CLICK_SECONDS = 60
 
-function doubleClick(coords: string, _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  const p = parsePoint(coords)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/double_click`, {
-    body: { x: p.x, y: p.y },
-  }))
-}
-
-function longClick(coords: string, options: { seconds?: string }, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  const p = parsePoint(coords)
-  // The wire field for the hold duration is `duration` (seconds).
-  const duration = options.seconds === undefined
-    ? undefined
-    : parseNumber(options.seconds, 'seconds')
-  send(createClient().requestJson('POST', `/api/computer/${serial}/long_click`, {
-    body: duration === undefined ? { x: p.x, y: p.y } : { x: p.x, y: p.y, duration },
-  }))
-}
-
-function move(coords: string, _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  const p = parsePoint(coords)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/move`, {
-    body: { x: p.x, y: p.y },
-  }))
-}
-
-function drag(coords: string, _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  const b = parseBounds(coords)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/drag`, {
-    body: { x1: b.x1, y1: b.y1, x2: b.x2, y2: b.y2 },
-  }))
-}
-
-function scroll(direction: string, options: { amount?: string }, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  const amount = options.amount === undefined
-    ? undefined
-    : parseNumber(options.amount, 'amount')
-  send(createClient().requestJson('POST', `/api/computer/${serial}/scroll`, {
-    body: amount === undefined ? { direction } : { direction, amount },
-  }))
-}
-
-function typeText(text: string, _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/type_text`, {
-    body: { text },
-  }))
-}
-
-function press(key: string, _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/press`, {
-    body: { key },
-  }))
-}
-
-function hotkey(keys: string[], _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/hotkey`, {
-    body: { keys },
-  }))
-}
-
-function position(_options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  send(createClient().requestJson('GET', `/api/computer/${serial}/position`))
-}
-
-function screenSize(_options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  send(createClient().requestJson('GET', `/api/computer/${serial}/screen_size`))
-}
-
-function permissions(_options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  send(createClient().requestJson('GET', `/api/computer/${serial}/permissions`))
-}
-
-function launchApp(app: string, _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  send(createClient().requestJson('POST', `/api/computer/${serial}/launch_app`, {
-    body: { app_name: app },
-  }))
-}
-
-// CLI argument is milliseconds; the wire field is `seconds`.
-function wait(milliseconds: string, _options: OptionValues, cmd: Command): void {
-  const serial = computerSerial(cmd)
-  const ms = parseNumber(milliseconds, 'duration')
-  if (ms <= 0) {
-    console.error('Error: wait duration must be greater than 0 ms')
-    process.exit(1)
-  }
-  send(createClient().requestJson('POST', `/api/computer/${serial}/wait`, {
-    body: { seconds: ms / 1000 },
-  }))
-}
-
-// --- Registration ---------------------------------------------------------
-
-const BUTTON_CHOICES = ['left', 'right', 'middle'] as const
-
-export function registerComputerCommands(parent: Command): Command {
+/**
+ * Computer platform group (macOS / Windows / Linux desktops).
+ *
+ * Every action targets `POST/GET /api/computer/{serialno}/{action}`. The serial
+ * is the platform `serialno` of a registered computer device — see
+ * `devicebase list-devices --type computer`. Coordinates are absolute screen
+ * pixels, in the same `x,y` / `x1,y1,x2,y2` style as the mobile group.
+ */
+export function createComputerCommand(): Command {
   const group = new Command(COMPUTER_GROUP)
-  group
-    .description('Control a computer device via /api/computer/{serial} (serial is the registered computer device id)')
-    .option('-s, --serial <serial>', 'Computer device id')
-    .addCommand(
-      new Command('click')
-        .argument('<coords>')
-        .description('Click at coordinates (x,y)')
-        .addOption(new Option('--button <button>', 'Mouse button to use').choices(BUTTON_CHOICES).default('left'))
-        .action(click),
-    )
-    .addCommand(
-      new Command('double-click')
-        .argument('<coords>')
-        .description('Double click at coordinates (x,y)')
-        .action(doubleClick),
-    )
-    .addCommand(
-      new Command('long-click')
-        .argument('<coords>')
-        .description('Press and hold at coordinates (x,y)')
-        .option('--seconds <number>', 'Hold duration in seconds')
-        .action(longClick),
-    )
-    .addCommand(
-      new Command('move')
-        .argument('<coords>')
-        .description('Move the mouse to coordinates (x,y)')
-        .action(move),
-    )
-    .addCommand(
-      new Command('drag')
-        .argument('<coords>')
-        .description('Drag the mouse from (x1,y1) to (x2,y2)')
-        .action(drag),
-    )
-    .addCommand(
-      new Command('scroll')
-        .argument('<direction>')
-        .description('Scroll in a direction (up|down|left|right)')
-        .option('--amount <number>', 'Scroll amount')
-        .action(scroll),
-    )
-    .addCommand(
-      new Command('type-text')
-        .argument('<text>')
-        .description('Type text at the current caret position')
-        .action(typeText),
-    )
-    .addCommand(
-      new Command('press')
-        .argument('<key>')
-        .description('Press a keyboard key')
-        .action(press),
-    )
-    .addCommand(
-      new Command('hotkey')
-        .argument('<keys...>')
-        .description('Send a keyboard shortcut, e.g. "hotkey ctrl shift s"')
-        .action(hotkey),
-    )
-    .addCommand(
-      new Command('position')
-        .description('Get the current mouse position')
-        .action(position),
-    )
-    .addCommand(
-      new Command('screen-size')
-        .description('Get the screen size')
-        .action(screenSize),
-    )
-    .addCommand(
-      new Command('permissions')
-        .description('Get the accessibility/automation permission status')
-        .action(permissions),
-    )
-    .addCommand(
-      new Command('launch-app')
-        .argument('<app>')
-        .description('Launch an application on the computer')
-        .action(launchApp),
-    )
-    .addCommand(
-      new Command('wait')
-        .argument('<ms>')
-        .description('Wait for a duration in milliseconds')
-        .action(wait),
-    )
-  parent.addCommand(group)
+    .description('Control a computer (desktop) platform device')
+    .option('-s, --serialno <serialno>', 'Platform serialno (sn from device list)')
+
+  const commands: Command[] = [
+    new Command('click')
+      .argument('<x,y>')
+      .description('Click at absolute screen coordinates')
+      // No default: the field is omitted and the server applies "left".
+      .option('--button <button>', `Mouse button: ${BUTTON_CHOICES.join('|')} (default: left)`)
+      .action(async (coords: string, options: { button?: string }, cmd: Command) => {
+        const point = parsePoint(coords)
+        const button = options.button
+        // Validated here rather than with commander's .choices() so the message
+        // matches the Go CLI byte for byte (`invalid button "x", expected …`).
+        if (button !== undefined && !BUTTON_CHOICES.includes(button as MouseButton)) {
+          return fail(`invalid button "${button}", expected one of: ${BUTTON_CHOICES.join(', ')}`)
+        }
+        printEnvelope(await createClient().computerClick(resolveSerial(cmd, COMPUTER_GROUP), {
+          x: point.x,
+          y: point.y,
+          button: button as MouseButton | undefined,
+        }))
+      }),
+    new Command('double-click')
+      .argument('<x,y>')
+      .description('Double click at absolute screen coordinates (left button)')
+      .action(async (coords: string, _options: OptionValues, cmd: Command) => {
+        const point = parsePoint(coords)
+        printEnvelope(await createClient().computerDoubleClick(resolveSerial(cmd, COMPUTER_GROUP), {
+          x: point.x,
+          y: point.y,
+        }))
+      }),
+    new Command('long-click')
+      .argument('<x,y>')
+      .description('Press and hold the left button at absolute screen coordinates')
+      .option('--seconds <seconds>', 'Hold duration in seconds (1-60; default: driver default)')
+      .action(async (coords: string, options: { seconds?: string }, cmd: Command) => {
+        const point = parsePoint(coords)
+        const seconds = parseSeconds(options.seconds)
+        const serial = resolveSerial(cmd, COMPUTER_GROUP)
+        printEnvelope(await createClient().computerLongClick(serial, {
+          x: point.x,
+          y: point.y,
+          duration: seconds || undefined,
+        }))
+      }),
+    new Command('move')
+      .argument('<x,y>')
+      .description('Move the mouse to absolute screen coordinates without clicking')
+      .action(async (coords: string, _options: OptionValues, cmd: Command) => {
+        const point = parsePoint(coords)
+        printEnvelope(await createClient().computerMove(resolveSerial(cmd, COMPUTER_GROUP), {
+          x: point.x,
+          y: point.y,
+        }))
+      }),
+    new Command('drag')
+      .argument('<x1,y1,x2,y2>')
+      .description('Press the left button at (x1,y1), move to (x2,y2) and release')
+      .action(async (coords: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerDrag(resolveSerial(cmd, COMPUTER_GROUP), parseBounds(coords)))
+      }),
+    new Command('scroll')
+      .argument('<direction>')
+      .description(`Scroll the mouse wheel: ${SCROLL_DIRECTIONS.join('|')}`)
+      .option('--amount <amount>', 'Scroll amount in wheel steps (default: driver default)')
+      .action(async (direction: string, options: { amount?: string }, cmd: Command) => {
+        if (!SCROLL_DIRECTIONS.includes(direction as ScrollDirection)) {
+          return fail(`invalid direction "${direction}", expected one of: ${SCROLL_DIRECTIONS.join(', ')}`)
+        }
+        const amount = options.amount === undefined
+          ? undefined
+          : parseIntegerToken(options.amount, `invalid amount "${options.amount}", expected an integer`)
+        printEnvelope(await createClient().computerScroll(
+          resolveSerial(cmd, COMPUTER_GROUP),
+          direction as ScrollDirection,
+          amount,
+        ))
+      }),
+    new Command('type-text')
+      .argument('<text>')
+      .description('Type text at the current caret position')
+      .action(async (text: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerTypeText(resolveSerial(cmd, COMPUTER_GROUP), requireArg(text, 'text')))
+      }),
+    new Command('press')
+      .argument('<key>')
+      .description('Press a keyboard key, e.g. Enter, Escape, a, F5')
+      .action(async (key: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerPress(resolveSerial(cmd, COMPUTER_GROUP), requireArg(key, 'key')))
+      }),
+    new Command('hotkey')
+      .argument('<keys...>')
+      .description('Press the given keys together, e.g. "hotkey Control Shift Escape"')
+      .action(async (keys: string[], _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerHotkey(resolveSerial(cmd, COMPUTER_GROUP), keys))
+      }),
+    new Command('position')
+      .description('Get the current absolute mouse position')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerPosition(resolveSerial(cmd, COMPUTER_GROUP)))
+      }),
+    new Command('screen-size')
+      .description('Get the primary screen size in pixels')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerScreenSize(resolveSerial(cmd, COMPUTER_GROUP)))
+      }),
+    new Command('permissions')
+      .description('Check the desktop control permissions (screen recording, accessibility, …)')
+      .action(async (_options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerPermissions(resolveSerial(cmd, COMPUTER_GROUP)))
+      }),
+    new Command('launch-app')
+      .argument('<app>')
+      .description('Launch a desktop application by name or path')
+      .action(async (app: string, _options: OptionValues, cmd: Command) => {
+        printEnvelope(await createClient().computerLaunchApp(resolveSerial(cmd, COMPUTER_GROUP), requireArg(app, 'app_name')))
+      }),
+    new Command('wait')
+      .argument('<ms>')
+      .description(`Block for a duration in milliseconds (${MIN_WAIT_MS}-${MAX_WAIT_MS})`)
+      .action(async (milliseconds: string, _options: OptionValues, cmd: Command) => {
+        const ms = parseIntegerToken(
+          milliseconds,
+          `invalid duration "${milliseconds}", expected milliseconds as an integer`,
+        )
+        if (ms < MIN_WAIT_MS || ms > MAX_WAIT_MS) {
+          return fail(`wait duration must be between ${MIN_WAIT_MS} and ${MAX_WAIT_MS} ms`)
+        }
+        printEnvelope(await createClient().computerWait(resolveSerial(cmd, COMPUTER_GROUP), ms))
+      }),
+    new Command('bash')
+      .argument('<command>')
+      .description('Run a shell command on the host machine (danger tier — see --help)')
+      .option('--timeout <seconds>', 'Command timeout in seconds (0-600; 0 or omitted: server default 120)')
+      .action(async (command: string, options: { timeout?: string }, cmd: Command) => {
+        const shellCommand = requireArg(command, 'command')
+        const timeout = options.timeout === undefined
+          ? 0
+          : parseIntegerToken(options.timeout, `invalid timeout "${options.timeout}", expected an integer`)
+        // 0 is valid — it means "omit the field" so the server default applies.
+        if (timeout < 0 || timeout > MAX_BASH_TIMEOUT_SECONDS) {
+          return fail(`--timeout must be between 0 and ${MAX_BASH_TIMEOUT_SECONDS} seconds (0 or omitted: server default)`)
+        }
+        printEnvelope(await createClient().computerBash(resolveSerial(cmd, COMPUTER_GROUP), shellCommand, timeout))
+      }),
+    createScreenshotCommand(COMPUTER_GROUP),
+  ]
+
+  for (const command of commands) {
+    group.addCommand(command)
+  }
+
   return group
+}
+
+function parseSeconds(raw: string | undefined): number {
+  if (raw === undefined) {
+    return 0
+  }
+  const seconds = parseIntegerToken(raw, `invalid seconds "${raw}", expected an integer`)
+  // 0 is valid — it means "omit the field" so the driver default applies.
+  if (seconds < 0 || seconds > MAX_LONG_CLICK_SECONDS) {
+    return fail(`--seconds must be between 1 and ${MAX_LONG_CLICK_SECONDS}`)
+  }
+  return seconds
 }

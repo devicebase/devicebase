@@ -1,34 +1,49 @@
 import type { Mock } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { Buffer } from 'node:buffer'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { Readable } from 'node:stream'
 import { Command } from 'commander'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BROWSER_GROUP, registerBrowserCommands } from '../src/cli/browser.js'
-import {
-  COMPUTER_GROUP,
-  registerComputerCommands,
-} from '../src/cli/computer.js'
-import { createCliProgram } from '../src/cli/index.js'
-import {
-  MOBILE_GROUP,
-  registerMobileAliases,
-  registerMobileGroup,
-} from '../src/cli/mobile.js'
+import { BROWSER_GROUP, createBrowserCommand } from '../src/cli/browser.js'
+import { COMPUTER_GROUP, createComputerCommand } from '../src/cli/computer.js'
+import { readInputText } from '../src/cli/helpers.js'
+import { createCliProgram, run } from '../src/cli/index.js'
+import { LIST_DEVICES_COMMAND } from '../src/cli/list-devices.js'
+import { createMobileCommand, MOBILE_GROUP } from '../src/cli/mobile.js'
 
 const API_KEY = 'test-api-key'
 const realFetch = globalThis.fetch
 
-interface FetchCall { url: URL, method: string, body: unknown, query: Record<string, string> }
+interface FetchCall {
+  url: URL
+  method: string
+  body: unknown
+  query: Record<string, string>
+}
 
-function fetchMockFor(): Mock {
-  return vi.fn(async (_input: unknown) => ({
+/** A fetch stub answering with the given JSON body. */
+function jsonResponse(body = '{}'): Mock {
+  return vi.fn(async () => ({
     ok: true,
     status: 200,
     statusText: 'OK',
-    text: async () => '{}',
+    text: async () => body,
     arrayBuffer: async () => new ArrayBuffer(0),
+  }))
+}
+
+/** A fetch stub answering with raw bytes (screenshots). */
+function binaryResponse(bytes: number[]): Mock {
+  const buffer = new Uint8Array(bytes).buffer
+  return vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    text: async () => '',
+    arrayBuffer: async () => buffer,
   }))
 }
 
@@ -74,22 +89,45 @@ interface WireRow {
   }
 }
 
-async function runWireRow(row: WireRow, fetchMock: Mock): Promise<void> {
-  const program = createCliProgram()
-  program.exitOverride()
-  await program.parseAsync(row.argv, { from: 'user' })
-  expectRequest(lastFetch(fetchMock), row.expected)
+async function runCli(argv: string[]): Promise<void> {
+  await createCliProgram().parseAsync(argv, { from: 'user' })
 }
 
-/** Errors/help/version may be raised on any command in the tree — override exits everywhere. */
-function overrideExits(program: Command): void {
-  program.exitOverride((err) => {
-    throw err
-  })
-  for (const child of program.commands) {
-    overrideExits(child)
-  }
+/** Run a command that must fail, returning the error for further assertions. */
+async function expectFailure(argv: string[], message: string | RegExp): Promise<Error> {
+  const error = await runCli(argv).then(
+    () => {
+      throw new Error(`expected "${argv.join(' ')}" to fail, but it succeeded`)
+    },
+    (err: Error) => err,
+  )
+  expect(error.message).toMatch(message)
+  return error
 }
+
+// --- Wire contract rows ---------------------------------------------------
+
+const MOBILE_ROWS: WireRow[] = [
+  { argv: ['mobile', '-s', 'dev-1', 'tap', '100,200'], expected: { path: '/v1/tap/dev-1', method: 'POST', body: { x: 100, y: 200 } } },
+  { argv: ['mobile', '-s', 'dev-1', 'double-tap', '50,60'], expected: { path: '/v1/double_tap/dev-1', method: 'POST', body: { x: 50, y: 60 } } },
+  { argv: ['mobile', '-s', 'dev-1', 'long-press', '50,60'], expected: { path: '/v1/long_press/dev-1', method: 'POST', body: { x: 50, y: 60 } } },
+  { argv: ['mobile', '-s', 'dev-1', 'swipe', '100,200,300,400'], expected: { path: '/v1/swipe/dev-1', method: 'POST', body: { x1: 100, y1: 200, x2: 300, y2: 400 } } },
+  { argv: ['mobile', '-s', 'dev-1', 'back'], expected: { path: '/v1/back/dev-1', method: 'POST' } },
+  { argv: ['mobile', '-s', 'dev-1', 'home'], expected: { path: '/v1/home/dev-1', method: 'POST' } },
+  { argv: ['mobile', '-s', 'dev-1', 'launch-app', 'com.example.app'], expected: { path: '/v1/launch_app/dev-1', method: 'POST', body: { app_name: 'com.example.app' } } },
+  { argv: ['mobile', '-s', 'dev-1', 'stop-app', 'com.example.app'], expected: { path: '/v1/stop_app/dev-1', method: 'POST', body: { app_name: 'com.example.app' } } },
+  { argv: ['mobile', '-s', 'dev-1', 'stop-current-app'], expected: { path: '/v1/stop_current_app/dev-1', method: 'POST' } },
+  { argv: ['mobile', '-s', 'dev-1', 'bash', 'ls -la'], expected: { path: '/v1/bash/dev-1', method: 'POST', body: { command: 'ls -la' } } },
+  { argv: ['mobile', '-s', 'dev-1', 'input', 'Hello 世界'], expected: { path: '/v1/input/dev-1', method: 'POST', body: { text: 'Hello 世界' } } },
+  { argv: ['mobile', '-s', 'dev-1', 'clear-text'], expected: { path: '/v1/clear_text/dev-1', method: 'POST' } },
+  { argv: ['mobile', '-s', 'dev-1', 'current-app'], expected: { path: '/v1/current_app/dev-1', method: 'POST' } },
+  { argv: ['mobile', '-s', 'dev-1', 'dump-hierarchy'], expected: { path: '/v1/dump_hierarchy/dev-1', method: 'POST' } },
+  { argv: ['mobile', '-s', 'dev-1', 'device-info'], expected: { path: '/v1/deviceinfo/dev-1', method: 'POST' } },
+  { argv: ['mobile', '-s', 'dev-1', 'install-app', '/tmp/app.apk'], expected: { path: '/v1/install_app/dev-1', method: 'POST', body: { app_path: '/tmp/app.apk' } } },
+  { argv: ['mobile', '-s', 'dev-1', 'install-status', 'install-42'], expected: { path: '/v1/install_status/dev-1', method: 'GET', query: { install_id: 'install-42' } } },
+  // Cross-family: screenshot is /v1/screen/{serial} for every platform.
+  { argv: ['mobile', '-s', 'dev-1', 'screenshot'], expected: { path: '/v1/screen/dev-1', method: 'POST' } },
+]
 
 const BROWSER_ROWS: WireRow[] = [
   { argv: ['browser', '-s', 'br-uuid', 'navigate', 'https://example.com'], expected: { path: '/api/browser/br-uuid/navigate', method: 'POST', body: { url: 'https://example.com' } } },
@@ -104,7 +142,7 @@ const BROWSER_ROWS: WireRow[] = [
   { argv: ['browser', '-s', 'br-uuid', 'attribute', '#link', 'href'], expected: { path: '/api/browser/br-uuid/attribute', method: 'GET', query: { selector: '#link', attribute: 'href' } } },
   { argv: ['browser', '-s', 'br-uuid', 'exists', '.empty'], expected: { path: '/api/browser/br-uuid/exists', method: 'GET', query: { selector: '.empty' } } },
   { argv: ['browser', '-s', 'br-uuid', 'execute', '1+1'], expected: { path: '/api/browser/br-uuid/execute', method: 'POST', body: { script: '1+1' } } },
-  { argv: ['browser', '-s', 'br-uuid', 'hotkey', 'ctrl', 'shift', 't'], expected: { path: '/api/browser/br-uuid/hotkey', method: 'POST', body: { keys: ['ctrl', 'shift', 't'] } } },
+  { argv: ['browser', '-s', 'br-uuid', 'hotkey', 'Meta', 'a'], expected: { path: '/api/browser/br-uuid/hotkey', method: 'POST', body: { keys: ['Meta', 'a'] } } },
   { argv: ['browser', '-s', 'br-uuid', 'state'], expected: { path: '/api/browser/br-uuid/state', method: 'GET' } },
   { argv: ['browser', '-s', 'br-uuid', 'tabs'], expected: { path: '/api/browser/br-uuid/tabs', method: 'GET' } },
   { argv: ['browser', '-s', 'br-uuid', 'tab-open', 'https://example.com/a'], expected: { path: '/api/browser/br-uuid/tab/open', method: 'POST', body: { url: 'https://example.com/a' } } },
@@ -113,12 +151,13 @@ const BROWSER_ROWS: WireRow[] = [
   { argv: ['browser', '-s', 'br-uuid', 'tab-switch', 'tab-2'], expected: { path: '/api/browser/br-uuid/tab/switch', method: 'POST', body: { tab_id: 'tab-2' } } },
   { argv: ['browser', '-s', 'br-uuid', 'launch'], expected: { path: '/api/browser/br-uuid/launch', method: 'POST' } },
   { argv: ['browser', '-s', 'br-uuid', 'close'], expected: { path: '/api/browser/br-uuid/close', method: 'POST' } },
+  { argv: ['browser', '-s', 'br-uuid', 'screenshot'], expected: { path: '/v1/screen/br-uuid', method: 'POST' } },
 ]
 
 const COMPUTER_ROWS: WireRow[] = [
-  { argv: ['computer', '-s', 'pc-1', 'click', '10,20'], expected: { path: '/api/computer/pc-1/click', method: 'POST', body: { x: 10, y: 20, button: 'left' } } },
+  // No --button: the field is omitted so the server applies its own "left" default.
+  { argv: ['computer', '-s', 'pc-1', 'click', '10,20'], expected: { path: '/api/computer/pc-1/click', method: 'POST', body: { x: 10, y: 20 } } },
   { argv: ['computer', '-s', 'pc-1', 'click', '10,20', '--button', 'right'], expected: { path: '/api/computer/pc-1/click', method: 'POST', body: { x: 10, y: 20, button: 'right' } } },
-  { argv: ['computer', '-s', 'pc-1', 'click', '10,20', '--button', 'middle'], expected: { path: '/api/computer/pc-1/click', method: 'POST', body: { x: 10, y: 20, button: 'middle' } } },
   { argv: ['computer', '-s', 'pc-1', 'double-click', '30,40'], expected: { path: '/api/computer/pc-1/double_click', method: 'POST', body: { x: 30, y: 40 } } },
   { argv: ['computer', '-s', 'pc-1', 'long-click', '5,5', '--seconds', '2'], expected: { path: '/api/computer/pc-1/long_click', method: 'POST', body: { x: 5, y: 5, duration: 2 } } },
   { argv: ['computer', '-s', 'pc-1', 'long-click', '5,5'], expected: { path: '/api/computer/pc-1/long_click', method: 'POST', body: { x: 5, y: 5 } } },
@@ -128,50 +167,17 @@ const COMPUTER_ROWS: WireRow[] = [
   { argv: ['computer', '-s', 'pc-1', 'scroll', 'up', '--amount', '3'], expected: { path: '/api/computer/pc-1/scroll', method: 'POST', body: { direction: 'up', amount: 3 } } },
   { argv: ['computer', '-s', 'pc-1', 'type-text', 'hello'], expected: { path: '/api/computer/pc-1/type_text', method: 'POST', body: { text: 'hello' } } },
   { argv: ['computer', '-s', 'pc-1', 'press', 'Enter'], expected: { path: '/api/computer/pc-1/press', method: 'POST', body: { key: 'Enter' } } },
-  { argv: ['computer', '-s', 'pc-1', 'hotkey', 'ctrl', 'alt', 's'], expected: { path: '/api/computer/pc-1/hotkey', method: 'POST', body: { keys: ['ctrl', 'alt', 's'] } } },
+  { argv: ['computer', '-s', 'pc-1', 'hotkey', 'Control', 'Shift', 'Escape'], expected: { path: '/api/computer/pc-1/hotkey', method: 'POST', body: { keys: ['Control', 'Shift', 'Escape'] } } },
   { argv: ['computer', '-s', 'pc-1', 'position'], expected: { path: '/api/computer/pc-1/position', method: 'GET' } },
   { argv: ['computer', '-s', 'pc-1', 'screen-size'], expected: { path: '/api/computer/pc-1/screen_size', method: 'GET' } },
   { argv: ['computer', '-s', 'pc-1', 'permissions'], expected: { path: '/api/computer/pc-1/permissions', method: 'GET' } },
   { argv: ['computer', '-s', 'pc-1', 'launch-app', 'Calculator'], expected: { path: '/api/computer/pc-1/launch_app', method: 'POST', body: { app_name: 'Calculator' } } },
+  // The CLI takes milliseconds; the wire field is seconds.
   { argv: ['computer', '-s', 'pc-1', 'wait', '500'], expected: { path: '/api/computer/pc-1/wait', method: 'POST', body: { seconds: 0.5 } } },
   { argv: ['computer', '-s', 'pc-1', 'wait', '2000'], expected: { path: '/api/computer/pc-1/wait', method: 'POST', body: { seconds: 2 } } },
-]
-
-const MOBILE_ROWS: WireRow[] = [
-  { argv: ['mobile', '-s', 'dev-1', 'tap', '100,200'], expected: { path: '/v1/tap/dev-1', method: 'POST', body: { x: 100, y: 200 } } },
-  { argv: ['mobile', '-s', 'dev-1', 'double-tap', '50,60'], expected: { path: '/v1/double_tap/dev-1', method: 'POST', body: { x: 50, y: 60 } } },
-  { argv: ['mobile', '-s', 'dev-1', 'long-press', '50,60'], expected: { path: '/v1/long_press/dev-1', method: 'POST', body: { x: 50, y: 60 } } },
-  { argv: ['mobile', '-s', 'dev-1', 'swipe', '100,200,300,400'], expected: { path: '/v1/swipe/dev-1', method: 'POST', body: { x1: 100, y1: 200, x2: 300, y2: 400 } } },
-  { argv: ['mobile', '-s', 'dev-1', 'back'], expected: { path: '/v1/back/dev-1', method: 'POST' } },
-  { argv: ['mobile', '-s', 'dev-1', 'home'], expected: { path: '/v1/home/dev-1', method: 'POST' } },
-  { argv: ['mobile', '-s', 'dev-1', 'launch-app', 'com.example.app'], expected: { path: '/v1/launch_app/dev-1', method: 'POST', body: { app_name: 'com.example.app' } } },
-  { argv: ['mobile', '-s', 'dev-1', 'input', 'Hello World'], expected: { path: '/v1/input/dev-1', method: 'POST', body: { text: 'Hello World' } } },
-  { argv: ['mobile', '-s', 'dev-1', 'clear-text'], expected: { path: '/v1/clear_text/dev-1', method: 'POST' } },
-  { argv: ['mobile', '-s', 'dev-1', 'current-app'], expected: { path: '/v1/current_app/dev-1', method: 'POST' } },
-  { argv: ['mobile', '-s', 'dev-1', 'dump-hierarchy'], expected: { path: '/v1/dump_hierarchy/dev-1', method: 'POST' } },
-  { argv: ['mobile', '-s', 'dev-1', 'device-info'], expected: { path: '/v1/deviceinfo/dev-1', method: 'POST' } },
-  { argv: ['mobile', '-s', 'dev-1', 'stop-app', 'com.example.app'], expected: { path: '/v1/stop_app/dev-1', method: 'POST', body: { app_name: 'com.example.app' } } },
-  { argv: ['mobile', '-s', 'dev-1', 'stop-current-app'], expected: { path: '/v1/stop_current_app/dev-1', method: 'POST' } },
-  { argv: ['mobile', '-s', 'dev-1', 'bash', 'ls -la'], expected: { path: '/v1/bash/dev-1', method: 'POST', body: { command: 'ls -la' } } },
-  { argv: ['mobile', '-s', 'dev-1', 'install-app', '/tmp/app.apk'], expected: { path: '/v1/install_app/dev-1', method: 'POST', body: { app_path: '/tmp/app.apk' } } },
-  { argv: ['mobile', '-s', 'dev-1', 'install-status', 'install-42'], expected: { path: '/v1/install_status/dev-1', method: 'GET', query: { install_id: 'install-42' } } },
-]
-
-// Legacy top-level aliases must hit exactly the same wire as the mobile group.
-const LEGACY_ALIAS_ROWS: WireRow[] = [
-  { argv: ['-s', 'dev-1', 'tap', '100,200'], expected: { path: '/v1/tap/dev-1', method: 'POST', body: { x: 100, y: 200 } } },
-  { argv: ['-s', 'dev-1', 'swipe', '0,0,300,400'], expected: { path: '/v1/swipe/dev-1', method: 'POST', body: { x1: 0, y1: 0, x2: 300, y2: 400 } } },
-  { argv: ['-s', 'dev-1', 'launch-app', 'com.tencent.mm'], expected: { path: '/v1/launch_app/dev-1', method: 'POST', body: { app_name: 'com.tencent.mm' } } },
-  { argv: ['-s', 'dev-1', 'input', 'ping'], expected: { path: '/v1/input/dev-1', method: 'POST', body: { text: 'ping' } } },
-  { argv: ['-s', 'dev-1', 'back'], expected: { path: '/v1/back/dev-1', method: 'POST' } },
-  { argv: ['-s', 'dev-1', 'home'], expected: { path: '/v1/home/dev-1', method: 'POST' } },
-  { argv: ['-s', 'dev-1', 'clear-text'], expected: { path: '/v1/clear_text/dev-1', method: 'POST' } },
-  { argv: ['-s', 'dev-1', 'current-app'], expected: { path: '/v1/current_app/dev-1', method: 'POST' } },
-  { argv: ['-s', 'dev-1', 'dump-hierarchy'], expected: { path: '/v1/dump_hierarchy/dev-1', method: 'POST' } },
-  { argv: ['-s', 'dev-1', 'device-info'], expected: { path: '/v1/deviceinfo/dev-1', method: 'POST' } },
-  { argv: ['-s', 'dev-1', 'double-tap', '1,2'], expected: { path: '/v1/double_tap/dev-1', method: 'POST', body: { x: 1, y: 2 } } },
-  { argv: ['-s', 'dev-1', 'long-press', '3,4'], expected: { path: '/v1/long_press/dev-1', method: 'POST', body: { x: 3, y: 4 } } },
-  { argv: ['-s', 'dev-1', 'screenshot'], expected: { path: '/v1/screen/dev-1', method: 'GET' } },
+  { argv: ['computer', '-s', 'pc-1', 'bash', 'ls -la'], expected: { path: '/api/computer/pc-1/bash', method: 'POST', body: { command: 'ls -la' } } },
+  { argv: ['computer', '-s', 'pc-1', 'bash', 'ls', '--timeout', '30'], expected: { path: '/api/computer/pc-1/bash', method: 'POST', body: { command: 'ls', timeout: 30 } } },
+  { argv: ['computer', '-s', 'pc-1', 'screenshot'], expected: { path: '/v1/screen/pc-1', method: 'POST' } },
 ]
 
 describe('devicebase CLI command tree', () => {
@@ -179,12 +185,12 @@ describe('devicebase CLI command tree', () => {
 
   beforeEach(() => {
     process.env.DEVICEBASE_API_KEY = API_KEY
-    // Silence per-command JSON output (and stdout binary writes).
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Silence the binary stdout of `screenshot` without losing the call record.
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-    globalThis.fetch = fetchMockFor()
+    globalThis.fetch = jsonResponse()
   })
 
   afterEach(() => {
@@ -193,14 +199,19 @@ describe('devicebase CLI command tree', () => {
     globalThis.fetch = realFetch
   })
 
-  it('registers the three platform groups, list-devices and the deprecated aliases', () => {
-    const program = createCliProgram()
-    const names = program.commands.map(c => c.name())
+  it('registers only list-devices and the three platform groups', () => {
+    const names = createCliProgram().commands.map(c => c.name())
     expect(names).toEqual([
+      LIST_DEVICES_COMMAND,
       MOBILE_GROUP,
       BROWSER_GROUP,
       COMPUTER_GROUP,
-      'list-devices',
+    ])
+  })
+
+  it('exposes the full mobile command set (18)', () => {
+    const names = createMobileCommand().commands.map(c => c.name())
+    expect(names).toEqual([
       'tap',
       'double-tap',
       'long-press',
@@ -208,41 +219,23 @@ describe('devicebase CLI command tree', () => {
       'back',
       'home',
       'launch-app',
+      'stop-app',
+      'stop-current-app',
+      'bash',
       'input',
       'clear-text',
       'current-app',
       'dump-hierarchy',
       'device-info',
+      'install-app',
+      'install-status',
       'screenshot',
     ])
-    // The new stop/bash/install commands exist only under the mobile group.
-    expect(program.commands.find(c => c.name() === 'mobile')?.commands.map(c => c.name()))
-      .toEqual([
-        'tap',
-        'double-tap',
-        'long-press',
-        'swipe',
-        'back',
-        'home',
-        'launch-app',
-        'input',
-        'clear-text',
-        'current-app',
-        'dump-hierarchy',
-        'device-info',
-        'screenshot',
-        'stop-app',
-        'stop-current-app',
-        'bash',
-        'install-app',
-        'install-status',
-      ])
   })
 
-  it('exposes the full browser command set (21)', () => {
-    const program = createCliProgram()
-    const browser = program.commands.find(c => c.name() === BROWSER_GROUP)
-    expect(browser?.commands.map(c => c.name())).toEqual([
+  it('exposes the full browser command set (22)', () => {
+    const names = createBrowserCommand().commands.map(c => c.name())
+    expect(names).toEqual([
       'navigate',
       'refresh',
       'go-back',
@@ -264,13 +257,13 @@ describe('devicebase CLI command tree', () => {
       'tab-switch',
       'launch',
       'close',
+      'screenshot',
     ])
   })
 
-  it('exposes the full computer command set (14)', () => {
-    const program = createCliProgram()
-    const computer = program.commands.find(c => c.name() === COMPUTER_GROUP)
-    expect(computer?.commands.map(c => c.name())).toEqual([
+  it('exposes the full computer command set (16)', () => {
+    const names = createComputerCommand().commands.map(c => c.name())
+    expect(names).toEqual([
       'click',
       'double-click',
       'long-click',
@@ -285,218 +278,352 @@ describe('devicebase CLI command tree', () => {
       'permissions',
       'launch-app',
       'wait',
+      'bash',
+      'screenshot',
     ])
   })
 
-  it('keeps legacy alias actions identical to the mobile group actions', () => {
-    const program = createCliProgram()
-    const mobile = program.commands.find(c => c.name() === MOBILE_GROUP)
-    const tapInGroup = mobile?.commands.find(c => c.name() === 'tap')
-    const tapAlias = program.commands.find(c => c.name() === 'tap')
-    expect(tapAlias?.action).toBe(tapInGroup?.action)
-    const screenshotInGroup = mobile?.commands.find(c => c.name() === 'screenshot')
-    const screenshotAlias = program.commands.find(c => c.name() === 'screenshot')
-    expect(screenshotAlias?.action).toBe(screenshotInGroup?.action)
-    // stop-app has no top-level alias.
-    expect(program.commands.find(c => c.name() === 'stop-app')).toBeUndefined()
+  it('drops the old flat top-level commands entirely', () => {
+    const names = createCliProgram().commands.map(c => c.name())
+    for (const legacy of ['tap', 'swipe', 'screenshot', 'device-info', 'dump-hierarchy']) {
+      expect(names).not.toContain(legacy)
+    }
   })
 
   describe('wire contract (method / path / body / query)', () => {
+    it.each(MOBILE_ROWS.map(r => [r.argv.join(' '), r] as const))(
+      'mobile %s',
+      async (_label, row) => {
+        await runCli(row.argv)
+        expectRequest(lastFetch(globalThis.fetch as Mock), row.expected)
+      },
+    )
+
     it.each(BROWSER_ROWS.map(r => [r.argv.join(' '), r] as const))(
       'browser %s',
       async (_label, row) => {
-        await runWireRow(row, globalThis.fetch as Mock)
+        await runCli(row.argv)
+        expectRequest(lastFetch(globalThis.fetch as Mock), row.expected)
       },
     )
 
     it.each(COMPUTER_ROWS.map(r => [r.argv.join(' '), r] as const))(
       'computer %s',
       async (_label, row) => {
-        await runWireRow(row, globalThis.fetch as Mock)
+        await runCli(row.argv)
+        expectRequest(lastFetch(globalThis.fetch as Mock), row.expected)
       },
     )
 
-    it.each(MOBILE_ROWS.map(r => [r.argv.join(' '), r] as const))(
-      'mobile %s',
-      async (_label, row) => {
-        await runWireRow(row, globalThis.fetch as Mock)
-      },
-    )
+    it('accepts the root -s before the group, as the Go CLI does', async () => {
+      await runCli(['-s', 'dev-1', 'mobile', 'tap', '100,200'])
+      expectRequest(lastFetch(globalThis.fetch as Mock), {
+        path: '/v1/tap/dev-1',
+        method: 'POST',
+        body: { x: 100, y: 200 },
+      })
+    })
 
-    it.each(LEGACY_ALIAS_ROWS.map(r => [r.argv.join(' '), r] as const))(
-      'legacy alias %s',
-      async (_label, row) => {
-        await runWireRow(row, globalThis.fetch as Mock)
-      },
-    )
-  })
+    it('list-devices passes type/keyword/state/limit as query params', async () => {
+      await runCli([
+        'list-devices',
+        '--type',
+        'browser',
+        '--keyword',
+        'mac',
+        '--state',
+        'free',
+        '--limit',
+        '5',
+      ])
+      expectRequest(lastFetch(globalThis.fetch as Mock), {
+        path: '/v1/devices',
+        method: 'GET',
+        query: { type: 'browser', keyword: 'mac', state: 'free', limit: '5' },
+      })
+    })
 
-  it('list-devices passes type/keyword/state/limit as query params', async () => {
-    const program = createCliProgram()
-    program.exitOverride()
-    await program.parseAsync(
-      ['list-devices', '--type', 'browser', '--keyword', 'mac', '--state', 'free', '--limit', '5'],
-      { from: 'user' },
-    )
-    expectRequest(lastFetch(globalThis.fetch as Mock), {
-      path: '/v1/devices',
-      method: 'GET',
-      query: { type: 'browser', keyword: 'mac', state: 'free', limit: '5' },
+    it('list-devices defaults --limit to 10', async () => {
+      await runCli(['list-devices'])
+      expectRequest(lastFetch(globalThis.fetch as Mock), {
+        path: '/v1/devices',
+        method: 'GET',
+        query: { limit: '10' },
+      })
+    })
+
+    it('list-devices rejects a non-positive or non-numeric --limit', async () => {
+      await expectFailure(['list-devices', '--limit', '0'], /--limit must be greater than 0, got 0/)
+      await expectFailure(['list-devices', '--limit', 'abc'], /invalid limit "abc", expected a positive integer/)
     })
   })
 
-  it('mobile screenshot without -o streams binary to stdout, with -o writes a file', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'devicebase-cli-'))
-    const out = join(dir, 'shot.png')
-    try {
-      const program = createCliProgram()
-      program.exitOverride()
-      await program.parseAsync(['mobile', '-s', 'dev-1', 'screenshot', '-o', out], { from: 'user' })
-      expect(logSpy.mock.calls.some(call => call[0] === `Screenshot saved to ${out}`)).toBe(true)
-      expect(globalThis.fetch as Mock).toHaveBeenCalledTimes(1)
-      const [input] = (globalThis.fetch as Mock).mock.calls[0] as [string]
-      expect(String(input)).toBe('https://api.devicebase.cn/v1/screen/dev-1')
-    }
-    finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
+  describe('output and exit handling', () => {
+    it('prints the server envelope verbatim, not a wrapper', async () => {
+      globalThis.fetch = jsonResponse(
+        '{"code":200,"message":"success","data":{"width":1470,"height":956},"timestamp":"t"}',
+      )
+      await runCli(['computer', '-s', 'pc-1', 'screen-size'])
+      expect(logSpy.mock.calls[0][0]).toBe(
+        '{"code":200,"message":"success","data":{"width":1470,"height":956},"timestamp":"t"}',
+      )
+    })
+
+    it('fails when an HTTP 200 carries a non-2xx envelope code', async () => {
+      globalThis.fetch = jsonResponse(
+        '{"code":502,"message":"Element not found: #nope","data":null}',
+      )
+      await expectFailure(
+        ['browser', '-s', 'br-1', 'click', '#nope'],
+        /API error \(code 502\): \{"code":502/,
+      )
+    })
+
+    it('includes the server body in an HTTP error', async () => {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        text: async () => '{"code":404,"message":"设备不存在: nope"}',
+        arrayBuffer: async () => new ArrayBuffer(0),
+      }))
+      await expectFailure(
+        ['computer', '-s', 'nope', 'position'],
+        /API error \(HTTP 404\): \{"code":404,"message":"设备不存在: nope"\}/,
+      )
+    })
+
+    it('propagates a network failure', async () => {
+      globalThis.fetch = vi.fn(async () => {
+        throw new Error('connect ECONNREFUSED')
+      })
+      await expectFailure(['computer', '-s', 'pc-1', 'position'], /ECONNREFUSED/)
+    })
+  })
+
+  describe('screenshot', () => {
+    // JPEG magic bytes — the format the server actually returns.
+    const JPEG = [0xFF, 0xD8, 0xFF, 0xE0]
+
+    it('streams raw bytes to stdout when no -o is given', async () => {
+      globalThis.fetch = binaryResponse(JPEG)
+      await runCli(['mobile', '-s', 'dev-1', 'screenshot'])
+      const written = vi.mocked(process.stdout.write).mock.calls[0][0] as Uint8Array
+      expect(Array.from(written)).toEqual(JPEG)
+    })
+
+    it('writes the file and stays quiet for a matching extension', async () => {
+      globalThis.fetch = binaryResponse(JPEG)
+      const dir = mkdtempSync(join(tmpdir(), 'devicebase-cli-'))
+      const out = join(dir, 'shot.jpg')
+      const errorSpy = vi.mocked(console.error)
+      try {
+        await runCli(['computer', '-s', 'pc-1', 'screenshot', '-o', out])
+        expect(logSpy.mock.calls[0][0]).toBe(`Screenshot saved to ${out}`)
+        expect(errorSpy).not.toHaveBeenCalled()
+        expect(new Uint8Array(readFileSync(out))).toEqual(new Uint8Array(JPEG))
+      }
+      finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('warns when the extension contradicts the bytes returned', async () => {
+      globalThis.fetch = binaryResponse(JPEG)
+      const dir = mkdtempSync(join(tmpdir(), 'devicebase-cli-'))
+      const out = join(dir, 'shot.png')
+      try {
+        await runCli(['computer', '-s', 'pc-1', 'screenshot', '-o', out])
+        expect(vi.mocked(console.error).mock.calls[0][0]).toBe(
+          `Warning: ${out} has a .png extension but the server returned JPEG data`,
+        )
+      }
+      finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
   })
 
   describe('argument and serial validation', () => {
-    it('errors when the group -s serial is missing (mobile group)', async () => {
-      const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-      const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const program = createCliProgram()
-      await program.parseAsync(['mobile', 'tap', '100,200'], { from: 'user' })
-      expect(exitMock).toHaveBeenCalledWith(1)
-      expect(errorMock.mock.calls[0][0]).toBe('Error: required flag(s) "--serial" not set')
-      expect(String(errorMock.mock.calls[1][0])).toContain('list-devices --type mobile')
+    it('reports a missing serial with the mobile group message and no hint', async () => {
+      // The mobile group is the broadest one: there is no narrower discovery
+      // hint to give, so the message stands alone (the Go CLI does the same).
+      const error = await expectFailure(
+        ['mobile', 'tap', '100,200'],
+        /^required flag\(s\) "--serialno" not set$/,
+      )
+      expect(error.message).not.toContain('HINT')
     })
 
-    it('errors without a platform hint for the deprecated aliases', async () => {
-      const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-      const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const program = createCliProgram()
-      await program.parseAsync(['tap', '100,200'], { from: 'user' })
-      expect(exitMock).toHaveBeenCalledWith(1)
-      expect(errorMock).toHaveBeenCalledTimes(1)
-      expect(errorMock.mock.calls[0][0]).toBe('Error: required flag(s) "--serial" not set')
+    it('hints list-devices --type browser when the browser serial is missing', async () => {
+      await expectFailure(
+        ['browser', 'state'],
+        /HINT: find a browser device to control first: devicebase list-devices --type browser/,
+      )
     })
 
-    it('hints list-devices --type browser when browser serial is missing', async () => {
-      const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-      const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const program = createCliProgram()
-      await program.parseAsync(['browser', 'state'], { from: 'user' })
-      expect(exitMock).toHaveBeenCalledWith(1)
-      expect(String(errorMock.mock.calls[1][0])).toContain('list-devices --type browser')
+    it('hints list-devices --type computer when the computer serial is missing', async () => {
+      await expectFailure(
+        ['computer', 'position'],
+        /HINT: find a computer device to control first: devicebase list-devices --type computer/,
+      )
     })
 
-    it('hints list-devices --type computer when computer serial is missing', async () => {
-      const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-      const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const program = createCliProgram()
-      await program.parseAsync(['computer', 'position'], { from: 'user' })
-      expect(exitMock).toHaveBeenCalledWith(1)
-      expect(String(errorMock.mock.calls[1][0])).toContain('list-devices --type computer')
-    })
-
-    it('rejects an invalid point format with the legacy error message', async () => {
-      const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-      const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const program = createCliProgram()
-      await program.parseAsync(['mobile', '-s', 'dev-1', 'tap', 'abc'], { from: 'user' })
-      expect(exitMock).toHaveBeenCalledWith(1)
-      expect(String(errorMock.mock.calls[0][0])).toContain('invalid point format "abc"')
+    it('rejects an invalid point format', async () => {
+      await expectFailure(['mobile', '-s', 'dev-1', 'tap', 'abc'], /invalid point format "abc", expected x,y/)
+      await expectFailure(['mobile', '-s', 'dev-1', 'tap', '1,abc'], /invalid y coordinate "abc"/)
     })
 
     it('rejects an invalid bounds format', async () => {
-      const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-      const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const program = createCliProgram()
-      await program.parseAsync(['computer', '-s', 'pc-1', 'drag', '1,2'], { from: 'user' })
-      expect(exitMock).toHaveBeenCalledWith(1)
-      expect(String(errorMock.mock.calls[0][0])).toContain('invalid bounds format "1,2"')
+      await expectFailure(['computer', '-s', 'pc-1', 'drag', '1,2'], /invalid bounds format "1,2", expected x1,y1,x2,y2/)
     })
 
-    it('rejects a non-positive wait duration', async () => {
-      const exitMock = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-      const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const program = createCliProgram()
-      await program.parseAsync(['computer', '-s', 'pc-1', 'wait', '0'], { from: 'user' })
-      expect(exitMock).toHaveBeenCalledWith(1)
-      expect(String(errorMock.mock.calls[0][0])).toContain('must be greater than 0 ms')
+    it('rejects a wait duration outside 1-300000 ms', async () => {
+      await expectFailure(['computer', '-s', 'pc-1', 'wait', '0'], /must be between 1 and 300000 ms/)
+      await expectFailure(['computer', '-s', 'pc-1', 'wait', '300001'], /must be between 1 and 300000 ms/)
     })
 
-    it('rejects an invalid --button choice through commander', async () => {
-      const program = createCliProgram()
-      overrideExits(program)
-      await expect(
-        program.parseAsync(['computer', '-s', 'pc-1', 'click', '1,2', '--button', 'sideways'], { from: 'user' }),
-      ).rejects.toMatchObject({ code: 'commander.invalidArgument' })
+    it('rejects a long-click --seconds outside 1-60', async () => {
+      await expectFailure(['computer', '-s', 'pc-1', 'long-click', '1,2', '--seconds', '61'], /--seconds must be between 1 and 60/)
+    })
+
+    it('rejects a bash --timeout above 600 seconds', async () => {
+      await expectFailure(['computer', '-s', 'pc-1', 'bash', 'ls', '--timeout', '601'], /--timeout must be between 0 and 600 seconds/)
+    })
+
+    it('rejects an invalid scroll direction', async () => {
+      await expectFailure(['computer', '-s', 'pc-1', 'scroll', 'sideways'], /invalid direction "sideways", expected one of: up, down, left, right/)
+    })
+
+    it('rejects an invalid --button with the Go CLI wording', async () => {
+      await expectFailure(
+        ['computer', '-s', 'pc-1', 'click', '1,2', '--button', 'sideways'],
+        /invalid button "sideways", expected one of: left, right, middle/,
+      )
+    })
+
+    it('rejects a blank positional argument', async () => {
+      await expectFailure(['browser', '-s', 'br-1', 'fill', '   ', 'x'], /selector cannot be empty/)
+      await expectFailure(['mobile', '-s', 'dev-1', 'launch-app', '  '], /app_name cannot be empty/)
     })
 
     it('rejects a missing required argument through commander', async () => {
-      const program = createCliProgram()
-      overrideExits(program)
       await expect(
-        program.parseAsync(['browser', '-s', 'br-uuid', 'navigate'], { from: 'user' }),
+        runCli(['browser', '-s', 'br-uuid', 'navigate']),
       ).rejects.toMatchObject({ code: 'commander.missingArgument' })
     })
   })
 
   describe('help and version output', () => {
-    it('lists groups, list-devices and deprecated aliases in root help', async () => {
-      const program = createCliProgram()
-      overrideExits(program)
-      await expect(program.parseAsync(['--help'], { from: 'user' })).rejects.toMatchObject({ code: 'commander.helpDisplayed' })
+    it('lists the four top-level commands in root help', async () => {
+      await expect(runCli(['--help'])).rejects.toMatchObject({ code: 'commander.helpDisplayed' })
       const text = vi.mocked(process.stdout.write).mock.calls.map(call => String(call[0])).join('')
+      expect(text).toContain('list-devices [options]')
       expect(text).toContain('mobile [options]')
       expect(text).toContain('browser [options]')
       expect(text).toContain('computer [options]')
-      expect(text).toContain('list-devices [options]')
-      expect(text).toContain('tap <coords>')
-      // Commander wraps long help lines to the console width — compare
-      // whitespace-insensitively so the phrase survives mid-description wraps.
-      expect(text.replace(/\s+/g, ' ')).toContain('deprecated: use "mobile tap" instead')
     })
 
     it('prints the version matching package.json', async () => {
-      const program = createCliProgram()
-      overrideExits(program)
-      await expect(program.parseAsync(['--version'], { from: 'user' })).rejects.toMatchObject({ code: 'commander.version' })
+      await expect(runCli(['--version'])).rejects.toMatchObject({ code: 'commander.version' })
       const text = vi.mocked(process.stdout.write).mock.calls.map(call => String(call[0])).join('')
       expect(text.trim()).toBe('0.2.0')
     })
   })
 })
 
-describe('cLI platform module registration helpers', () => {
-  it('registerMobileGroup / registerMobileAliases / registerBrowserCommands / registerComputerCommands attach to any parent', () => {
+describe('readInputText', () => {
+  it('prefers the positional argument when given', async () => {
+    await expect(readInputText('hello 世界', 'usage')).resolves.toBe('hello 世界')
+  })
+
+  it('reads stdin and drops the trailing newline', async () => {
+    await expect(readInputText(undefined, 'usage', Readable.from(['hello\n']))).resolves.toBe('hello')
+  })
+
+  it('keeps a multi-byte character split across chunks intact', async () => {
+    const bytes = Buffer.from('世界', 'utf8')
+    const stream = Readable.from([
+      bytes.subarray(0, 1),
+      bytes.subarray(1, 4),
+      bytes.subarray(4),
+    ])
+    await expect(readInputText(undefined, 'usage', stream)).resolves.toBe('世界')
+  })
+
+  it('fails on empty or whitespace-only stdin', async () => {
+    await expect(readInputText(undefined, 'usage', Readable.from(['\n']))).rejects.toThrow(/no text received on stdin/)
+    await expect(readInputText(undefined, 'usage', Readable.from(['   \n']))).rejects.toThrow(/no text received on stdin/)
+  })
+
+  it('fails fast on a TTY instead of blocking for input', async () => {
+    const tty = Readable.from([]) as Readable & { isTTY?: boolean }
+    tty.isTTY = true
+    await expect(readInputText(undefined, 'usage', tty)).rejects.toThrow(/pass it as an argument or pipe it in/)
+  })
+})
+
+describe('run() exit handling', () => {
+  beforeEach(() => {
+    process.env.DEVICEBASE_API_KEY = API_KEY
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    globalThis.fetch = jsonResponse()
+    process.exitCode = undefined
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete process.env.DEVICEBASE_API_KEY
+    globalThis.fetch = realFetch
+    process.exitCode = undefined
+  })
+
+  it('prints "Error: <message>" on stderr and sets exit code 1', async () => {
+    await run(['node', 'devicebase', 'mobile', 'tap', '100,200'])
+    expect(process.exitCode).toBe(1)
+    expect(vi.mocked(console.error).mock.calls[0][0]).toBe(
+      'Error: required flag(s) "--serialno" not set',
+    )
+  })
+
+  it('leaves a successful command without an exit code', async () => {
+    await run(['node', 'devicebase', 'mobile', '-s', 'dev-1', 'back'])
+    expect(process.exitCode).toBeUndefined()
+  })
+
+  it('maps a commander usage error onto its exit code without re-printing', async () => {
+    await run(['node', 'devicebase', 'computer', '-s', 'pc-1', 'click', '1,2', '--nosuchflag'])
+    expect(process.exitCode).toBe(1)
+    // Commander already wrote the usage error to stderr.
+    expect(vi.mocked(console.error)).not.toHaveBeenCalled()
+  })
+
+  it('exits 0 for --help', async () => {
+    await run(['node', 'devicebase', '--help'])
+    expect(process.exitCode).toBe(0)
+  })
+})
+
+describe('platform module factories', () => {
+  it('each factory attaches its group to any parent command', () => {
     const parent = new Command('probe')
-    registerMobileGroup(parent)
-    registerBrowserCommands(parent)
-    registerComputerCommands(parent)
-    registerMobileAliases(parent)
+    parent.addCommand(createMobileCommand())
+    parent.addCommand(createBrowserCommand())
+    parent.addCommand(createComputerCommand())
     expect(parent.commands.map(c => c.name())).toEqual([
       MOBILE_GROUP,
       BROWSER_GROUP,
       COMPUTER_GROUP,
-      'tap',
-      'double-tap',
-      'long-press',
-      'swipe',
-      'back',
-      'home',
-      'launch-app',
-      'input',
-      'clear-text',
-      'current-app',
-      'dump-hierarchy',
-      'device-info',
-      'screenshot',
     ])
-    const mobile = parent.commands.find(c => c.name() === MOBILE_GROUP)
-    expect(mobile?.commands.map(c => c.name())).toHaveLength(18)
+  })
+
+  it('produces a fresh group per call so a command is never registered twice', () => {
+    const first = createMobileCommand()
+    const second = createMobileCommand()
+    expect(first).not.toBe(second)
+    expect(first.commands[0]).not.toBe(second.commands[0])
   })
 })
