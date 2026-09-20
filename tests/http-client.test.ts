@@ -152,7 +152,7 @@ describe('deviceBaseHttpClient', () => {
       expect(computerPath('screen_size', 'pc-1')).toBe('/api/computer/pc-1/screen_size')
     })
 
-    it('encode a serial that needs escaping', () => {
+    it('encode a serialno that needs escaping', () => {
       expect(mobilePath('tap', 'a b/c')).toBe('/v1/tap/a%20b%2Fc')
     })
   })
@@ -201,7 +201,7 @@ describe('deviceBaseHttpClient', () => {
     })
 
     it('inspects the envelope of a byte response, so a failed capture is not image data', async () => {
-      const envelope = '{"code":500,"message":"Device not found for serial x","data":null}'
+      const envelope = '{"code":500,"message":"Device not found for serialno x","data":null}'
       globalThis.fetch = vi.fn(async () => ({
         ok: true,
         status: 200,
@@ -224,10 +224,10 @@ describe('deviceBaseHttpClient', () => {
       globalThis.fetch = jsonFetch({ success: true })
     })
 
-    it('getDeviceInfo sends POST to /v1/deviceinfo/{serial}', async () => {
+    it('getDeviceInfo sends POST to /v1/deviceinfo/{serialno}', async () => {
       globalThis.fetch = jsonFetch({ model: 'Pixel 7', os: 'Android 14' })
       const result = await client.getDeviceInfo('device123')
-      expect(result.serial).toBe('device123')
+      expect(result.serialno).toBe('device123')
       expect(result.data).toEqual({ model: 'Pixel 7', os: 'Android 14' })
       expect(lastCall()[0]).toBe(`${BASE_URL}/v1/deviceinfo/device123`)
       expect(lastCall()[1].method).toBe('POST')
@@ -274,7 +274,7 @@ describe('deviceBaseHttpClient', () => {
       expect(lastCall()[1].method).toBe('GET')
     })
 
-    it('getScreenshot POSTs to /v1/screen/{serial}', async () => {
+    it('getScreenshot POSTs to /v1/screen/{serialno}', async () => {
       globalThis.fetch = bytesFetch([0xFF, 0xD8, 0xFF])
       await client.getScreenshot('device123')
       expect(lastCall()[0]).toBe(`${BASE_URL}/v1/screen/device123`)

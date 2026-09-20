@@ -17,10 +17,10 @@ export const MOBILE_GROUP = 'mobile'
  * Mobile platform group — Android / HarmonyOS / iOS.
  *
  * Every action targets `POST/GET /v1/{action}/{serialno}` on the control API.
- * The serial is a mobile device serial (adb/hdc/ios) and the coordinates keep
+ * The serialno is a mobile device serialno (adb/hdc/ios) and the coordinates keep
  * the original CLI's style: points as `x,y`, bounds as `x1,y1,x2,y2`.
  *
- * The mobile group carries no discovery hint on a missing serial — there is
+ * The mobile group carries no discovery hint on a missing serialno — there is
  * nothing narrower than `list-devices` to point at — unlike the browser and
  * computer groups, whose serials come from a typed lookup.
  */

@@ -4,7 +4,7 @@ import { DeviceBaseClient } from '../src/index.js'
 
 const client = new DeviceBaseClient({
   apiKey: process.env.DEVICEBASE_API_KEY,
-  serial: process.env.SERIAL!,
+  serialno: process.env.DEVICEBASE_SERIALNO!,
 })
 
 async function main() {

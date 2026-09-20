@@ -11,7 +11,7 @@ import { createMobileCommand } from './mobile.js'
 /**
  * Root command tree:
  *
- *   devicebase list-devices        device discovery (no serial required)
+ *   devicebase list-devices        device discovery (no serialno required)
  *   devicebase mobile    -s <serialno>   Android / HarmonyOS / iOS — /v1/{action}/{serialno}
  *   devicebase browser   -s <serialno>   Chrome/CDP — /api/browser/{serialno}/{action}
  *   devicebase computer  -s <serialno>   desktop — /api/computer/{serialno}/{action}

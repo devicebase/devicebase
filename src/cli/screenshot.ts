@@ -12,7 +12,7 @@ import { createClient, fail, resolveSerial } from './helpers.js'
  * browser → CDP capture, otherwise the device image queue), so one command
  * serves every platform. It is registered in each platform group so `--help`
  * surfaces it there — hence the optional `platform`, which only decides whether
- * a missing serial reports that group's discovery hint.
+ * a missing serialno reports that group's discovery hint.
  */
 export function createScreenshotCommand(platform?: Platform): Command {
   return new Command('screenshot')

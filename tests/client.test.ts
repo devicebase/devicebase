@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DeviceBaseClient } from '../src/client.js'
-import { AuthenticationError } from '../src/http-client.js'
+import { AuthenticationError, ValidationError } from '../src/http-client.js'
 
 const API_KEY = 'test-api-key'
 const BASE_URL = 'http://localhost:9999'
@@ -15,13 +15,13 @@ describe('deviceBaseClient', () => {
     it('throws AuthenticationError without API key', () => {
       const orig = process.env.DEVICEBASE_API_KEY
       delete process.env.DEVICEBASE_API_KEY
-      expect(() => new DeviceBaseClient({ serial: SERIAL })).toThrow(AuthenticationError)
+      expect(() => new DeviceBaseClient({ serialno: SERIAL })).toThrow(AuthenticationError)
       process.env.DEVICEBASE_API_KEY = orig
     })
 
     it('creates client with explicit config', () => {
       const client = new DeviceBaseClient({
-        serial: SERIAL,
+        serialno: SERIAL,
         apiKey: API_KEY,
         baseUrl: BASE_URL,
       })
@@ -31,9 +31,44 @@ describe('deviceBaseClient', () => {
     it('reads API key from env', () => {
       const orig = process.env.DEVICEBASE_API_KEY
       process.env.DEVICEBASE_API_KEY = API_KEY
-      const client = new DeviceBaseClient({ serial: SERIAL, baseUrl: BASE_URL })
+      const client = new DeviceBaseClient({ serialno: SERIAL, baseUrl: BASE_URL })
       expect(client).toBeDefined()
       process.env.DEVICEBASE_API_KEY = orig
+    })
+  })
+
+  describe('deprecated serial key', () => {
+    it('still binds, and warns once', () => {
+      const warn = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
+      const client = new DeviceBaseClient({
+        serial: SERIAL,
+        apiKey: API_KEY,
+        baseUrl: BASE_URL,
+      })
+
+      expect(client).toBeDefined()
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('serialno'),
+        'DeprecationWarning',
+      )
+    })
+
+    it('rejects passing both, rather than silently picking one', () => {
+      expect(
+        () =>
+          new DeviceBaseClient({
+            serialno: SERIAL,
+            serial: 'other',
+            apiKey: API_KEY,
+            baseUrl: BASE_URL,
+          }),
+      ).toThrow(ValidationError)
+    })
+
+    it('rejects passing neither', () => {
+      expect(
+        () => new DeviceBaseClient({ apiKey: API_KEY, baseUrl: BASE_URL }),
+      ).toThrow(ValidationError)
     })
   })
 
@@ -42,7 +77,7 @@ describe('deviceBaseClient', () => {
 
     beforeEach(() => {
       client = new DeviceBaseClient({
-        serial: SERIAL,
+        serialno: SERIAL,
         apiKey: API_KEY,
         baseUrl: BASE_URL,
       })
@@ -57,7 +92,7 @@ describe('deviceBaseClient', () => {
       })
 
       const result = await client.getDeviceInfo()
-      expect(result.serial).toBe(SERIAL)
+      expect(result.serialno).toBe(SERIAL)
       expect(result.data).toEqual(mockData)
     })
 
@@ -287,7 +322,7 @@ describe('deviceBaseClient', () => {
   describe('webSocket client factories', () => {
     it('minicapClient returns configured MinicapClient', () => {
       const client = new DeviceBaseClient({
-        serial: SERIAL,
+        serialno: SERIAL,
         apiKey: API_KEY,
         baseUrl: BASE_URL,
       })
@@ -297,7 +332,7 @@ describe('deviceBaseClient', () => {
 
     it('minitouchClient returns configured MinitouchClient', () => {
       const client = new DeviceBaseClient({
-        serial: SERIAL,
+        serialno: SERIAL,
         apiKey: API_KEY,
         baseUrl: BASE_URL,
       })

@@ -50,14 +50,14 @@ export function createClient(): DeviceBaseHttpClient {
  *   devicebase -s <serialno> mobile tap 100,200
  *   devicebase mobile -s <serialno> tap 100,200
  *
- * When no serial is given anywhere the command aborts with the conventional
+ * When no serialno is given anywhere the command aborts with the conventional
  * message, plus a platform discovery hint when the caller named one.
  */
 export function resolveSerial(cmd: Command, platform?: Platform): string {
   for (let node: Command | null | undefined = cmd; node; node = node.parent) {
-    const serial = (node.opts() as { serialno?: string }).serialno
-    if (serial) {
-      return serial
+    const serialno = (node.opts() as { serialno?: string }).serialno
+    if (serialno) {
+      return serialno
     }
   }
   const hint = platform

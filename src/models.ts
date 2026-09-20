@@ -30,7 +30,7 @@ export type ScrollDirection = 'up' | 'down' | 'left' | 'right'
 // --- Results --------------------------------------------------------------
 
 export interface DeviceInfo {
-  readonly serial: string
+  readonly serialno: string
   readonly data: Record<string, unknown>
 }
 
@@ -172,8 +172,8 @@ export function createBounds(x1: number, y1: number, x2: number, y2: number): Bo
   return Object.freeze({ x1, y1, x2, y2 })
 }
 
-export function createDeviceInfo(serial: string, data: Record<string, unknown>): DeviceInfo {
-  return Object.freeze({ serial, data })
+export function createDeviceInfo(serialno: string, data: Record<string, unknown>): DeviceInfo {
+  return Object.freeze({ serialno, data })
 }
 
 export function createAppInfo(data: Record<string, unknown>): AppInfo {

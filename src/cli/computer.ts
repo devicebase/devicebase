@@ -31,7 +31,7 @@ const MAX_LONG_CLICK_SECONDS = 60
 /**
  * Computer platform group (macOS / Windows / Linux desktops).
  *
- * Every action targets `POST/GET /api/computer/{serialno}/{action}`. The serial
+ * Every action targets `POST/GET /api/computer/{serialno}/{action}`. The serialno
  * is the platform `serialno` of a registered computer device — see
  * `devicebase list-devices --type computer`. Coordinates are absolute screen
  * pixels, in the same `x,y` / `x1,y1,x2,y2` style as the mobile group.
@@ -78,8 +78,8 @@ export function createComputerCommand(): Command {
       .action(async (coords: string, options: { seconds?: string }, cmd: Command) => {
         const point = parsePoint(coords)
         const seconds = parseSeconds(options.seconds)
-        const serial = resolveSerial(cmd, COMPUTER_GROUP)
-        printEnvelope(await createClient().computerLongClick(serial, {
+        const serialno = resolveSerial(cmd, COMPUTER_GROUP)
+        printEnvelope(await createClient().computerLongClick(serialno, {
           x: point.x,
           y: point.y,
           duration: seconds || undefined,

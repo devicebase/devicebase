@@ -125,7 +125,7 @@ const MOBILE_ROWS: WireRow[] = [
   { argv: ['mobile', '-s', 'dev-1', 'device-info'], expected: { path: '/v1/deviceinfo/dev-1', method: 'POST' } },
   { argv: ['mobile', '-s', 'dev-1', 'install-app', '/tmp/app.apk'], expected: { path: '/v1/install_app/dev-1', method: 'POST', body: { app_path: '/tmp/app.apk' } } },
   { argv: ['mobile', '-s', 'dev-1', 'install-status', 'install-42'], expected: { path: '/v1/install_status/dev-1', method: 'GET', query: { install_id: 'install-42' } } },
-  // Cross-family: screenshot is /v1/screen/{serial} for every platform.
+  // Cross-family: screenshot is /v1/screen/{serialno} for every platform.
   { argv: ['mobile', '-s', 'dev-1', 'screenshot'], expected: { path: '/v1/screen/dev-1', method: 'POST' } },
 ]
 
@@ -444,8 +444,8 @@ describe('devicebase CLI command tree', () => {
     })
   })
 
-  describe('argument and serial validation', () => {
-    it('reports a missing serial with the mobile group message and no hint', async () => {
+  describe('argument and serialno validation', () => {
+    it('reports a missing serialno with the mobile group message and no hint', async () => {
       // The mobile group is the broadest one: there is no narrower discovery
       // hint to give, so the message stands alone (the Go CLI does the same).
       const error = await expectFailure(
@@ -455,14 +455,14 @@ describe('devicebase CLI command tree', () => {
       expect(error.message).not.toContain('HINT')
     })
 
-    it('hints list-devices --type browser when the browser serial is missing', async () => {
+    it('hints list-devices --type browser when the browser serialno is missing', async () => {
       await expectFailure(
         ['browser', 'state'],
         /HINT: find a browser device to control first: devicebase list-devices --type browser/,
       )
     })
 
-    it('hints list-devices --type computer when the computer serial is missing', async () => {
+    it('hints list-devices --type computer when the computer serialno is missing', async () => {
       await expectFailure(
         ['computer', 'position'],
         /HINT: find a computer device to control first: devicebase list-devices --type computer/,

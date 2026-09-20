@@ -82,7 +82,7 @@ HINT: find a browser device to control first: devicebase list-devices --type bro
 
 | Group      | `-s, --serialno` value              | How to find it                                |
 | ---------- | ----------------------------------- | --------------------------------------------- |
-| `mobile`   | Mobile device serial number         | `npx devicebase list-devices --type mobile`   |
+| `mobile`   | The mobile device's serialno          | `npx devicebase list-devices --type mobile`   |
 | `browser`  | Registered browser device serialno  | `npx devicebase list-devices --type browser`  |
 | `computer` | Registered computer device serialno | `npx devicebase list-devices --type computer` |
 
@@ -127,7 +127,7 @@ System types are matched against `os_type`, not the device row's `type` — a de
 
 ### Mobile platform (`npx devicebase mobile -s <serialno> …`)
 
-Serial: mobile device serial (adb/hdc/ios). Endpoints: `POST/GET /v1/{action}/{serialno}`. Coordinates keep the original CLI's style: points as `x,y`, bounds as `x1,y1,x2,y2`.
+Serial: mobile device serialno (adb/hdc/ios). Endpoints: `POST/GET /v1/{action}/{serialno}`. Coordinates keep the original CLI's style: points as `x,y`, bounds as `x1,y1,x2,y2`.
 
 | Command | Description |
 | ------- | ----------- |
@@ -279,14 +279,14 @@ The full removed set: `tap`, `double-tap`, `long-press`, `swipe`, `back`, `home`
 
 ### Mobile — `DeviceBaseClient`
 
-A serial-bound facade for one mobile device:
+A serialno-bound facade for one mobile device:
 
 ```typescript
 import { DeviceBaseClient } from 'devicebase'
 
 const client = new DeviceBaseClient({
   apiKey: 'your-api-key',
-  serial: 'device-serial-number',
+  serialno: 'your-serialno',
 })
 
 const deviceInfo = await client.getDeviceInfo()
@@ -379,12 +379,26 @@ All API failures throw a subclass of `DeviceBaseError`, carrying `statusCode` (H
 
 ```typescript
 const client = new DeviceBaseClient({
-  serial: 'device-serial', // Required: device serial number
+  serialno: 'your-serialno', // Required: the device's platform serialno
   apiKey: 'your-api-key', // Optional: defaults to DEVICEBASE_API_KEY
   baseUrl: 'https://api.devicebase.cn', // Optional: API base URL
   timeout: 30000, // Optional: request timeout in ms (default: 30000)
 })
 ```
+
+### `serial` is renamed `serialno`
+
+The device identifier is spelled `serialno` throughout, matching the CLI (which
+already used `-s, --serialno`), the API contract, and the other SDKs.
+
+| Was | Now |
+|-----|-----|
+| `new DeviceBaseClient({ serial })` | `new DeviceBaseClient({ serialno })` — `serial` still accepted, warns |
+| `DeviceInfo.serial` | `DeviceInfo.serialno` |
+| every action's first argument | unchanged positionally; the parameter is now named `serialno` |
+
+Passing both `serialno` and `serial` throws `ValidationError` rather than
+silently picking one. The deprecated key is removed in the next major release.
 
 ## WebSocket Streaming
 

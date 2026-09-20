@@ -31,7 +31,7 @@ describe('models', () => {
   describe('createDeviceInfo', () => {
     it('creates frozen device info', () => {
       const info = createDeviceInfo('serial123', { model: 'Pixel 7' })
-      expect(info.serial).toBe('serial123')
+      expect(info.serialno).toBe('serial123')
       expect(info.data).toEqual({ model: 'Pixel 7' })
       expect(Object.isFrozen(info)).toBe(true)
     })

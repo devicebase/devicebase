@@ -5,58 +5,58 @@ import { createOperationResult } from '../models.js'
 /**
  * Browser platform API (Chrome/Chromium/Edge over CDP).
  *
- * Path template: `POST/GET /api/browser/{serial}/{action...}`. Contract mirrors
+ * Path template: `POST/GET /api/browser/{serialno}/{action...}`. Contract mirrors
  * the Go CLI's `internal/api/browser.go` (single source of truth:
  * `browser-control.ts`).
  *
  * GET actions (state/tabs/text/attribute/exists) carry no body; selectors travel
- * as query parameters. The serial is the platform `serialno` of a registered
+ * as query parameters. The serialno is the platform `serialno` of a registered
  * browser device, as listed by `listDevices({ type: 'browser' })`.
  */
 
-/** Build `/api/browser/{serial}/{action}`. */
-export function browserPath(action: string, serial: string): string {
-  return `/api/browser/${encodeURIComponent(serial)}/${action}`
+/** Build `/api/browser/{serialno}/{action}`. */
+export function browserPath(action: string, serialno: string): string {
+  return `/api/browser/${encodeURIComponent(serialno)}/${action}`
 }
 
 export function BrowserApi<TBase extends Constructor<HttpTransport>>(Base: TBase) {
   return class BrowserApiMixin extends Base {
     // Navigation
 
-    /** POST /api/browser/{serial}/navigate — body {"url"}. */
-    async browserNavigate(serial: string, url: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('navigate', serial), {
+    /** POST /api/browser/{serialno}/navigate — body {"url"}. */
+    async browserNavigate(serialno: string, url: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('navigate', serialno), {
         body: { url },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/refresh */
-    async browserRefresh(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('refresh', serial))
+    /** POST /api/browser/{serialno}/refresh */
+    async browserRefresh(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('refresh', serialno))
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/go_back */
-    async browserGoBack(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('go_back', serial))
+    /** POST /api/browser/{serialno}/go_back */
+    async browserGoBack(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('go_back', serialno))
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/go_forward */
-    async browserGoForward(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('go_forward', serial))
+    /** POST /api/browser/{serialno}/go_forward */
+    async browserGoForward(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('go_forward', serialno))
       return createOperationResult(data)
     }
 
     /**
-     * POST /api/browser/{serial}/input — body {"text"}.
+     * POST /api/browser/{serialno}/input — body {"text"}.
      *
      * CDP `Input.insertText` into the page's focused element — reliable for CJK,
      * unlike synthesised key events.
      */
-    async browserInput(serial: string, text: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('input', serial), {
+    async browserInput(serialno: string, text: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('input', serialno), {
         body: { text },
       })
       return createOperationResult(data)
@@ -64,69 +64,69 @@ export function BrowserApi<TBase extends Constructor<HttpTransport>>(Base: TBase
 
     // DOM
 
-    /** POST /api/browser/{serial}/click — body {"selector"}. */
-    async browserClick(serial: string, selector: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('click', serial), {
+    /** POST /api/browser/{serialno}/click — body {"selector"}. */
+    async browserClick(serialno: string, selector: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('click', serialno), {
         body: { selector },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/fill — body {"selector","value"}. */
-    async browserFill(serial: string, selector: string, value: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('fill', serial), {
+    /** POST /api/browser/{serialno}/fill — body {"selector","value"}. */
+    async browserFill(serialno: string, selector: string, value: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('fill', serialno), {
         body: { selector, value },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/select — body {"selector","value"}. */
-    async browserSelect(serial: string, selector: string, value: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('select', serial), {
+    /** POST /api/browser/{serialno}/select — body {"selector","value"}. */
+    async browserSelect(serialno: string, selector: string, value: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('select', serialno), {
         body: { selector, value },
       })
       return createOperationResult(data)
     }
 
-    /** GET /api/browser/{serial}/text?selector={selector} */
-    async browserText(serial: string, selector: string): Promise<OperationResult> {
-      const data = await this.requestJson('GET', browserPath('text', serial), {
+    /** GET /api/browser/{serialno}/text?selector={selector} */
+    async browserText(serialno: string, selector: string): Promise<OperationResult> {
+      const data = await this.requestJson('GET', browserPath('text', serialno), {
         query: { selector },
       })
       return createOperationResult(data)
     }
 
-    /** GET /api/browser/{serial}/attribute?selector=&attribute= */
+    /** GET /api/browser/{serialno}/attribute?selector=&attribute= */
     async browserAttribute(
-      serial: string,
+      serialno: string,
       selector: string,
       attribute: string,
     ): Promise<OperationResult> {
-      const data = await this.requestJson('GET', browserPath('attribute', serial), {
+      const data = await this.requestJson('GET', browserPath('attribute', serialno), {
         query: { selector, attribute },
       })
       return createOperationResult(data)
     }
 
-    /** GET /api/browser/{serial}/exists?selector={selector} */
-    async browserExists(serial: string, selector: string): Promise<OperationResult> {
-      const data = await this.requestJson('GET', browserPath('exists', serial), {
+    /** GET /api/browser/{serialno}/exists?selector={selector} */
+    async browserExists(serialno: string, selector: string): Promise<OperationResult> {
+      const data = await this.requestJson('GET', browserPath('exists', serialno), {
         query: { selector },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/execute — body {"script"}. */
-    async browserExecute(serial: string, script: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('execute', serial), {
+    /** POST /api/browser/{serialno}/execute — body {"script"}. */
+    async browserExecute(serialno: string, script: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('execute', serialno), {
         body: { script },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/hotkey — body {"keys": [...]}. */
-    async browserHotkey(serial: string, keys: readonly string[]): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('hotkey', serial), {
+    /** POST /api/browser/{serialno}/hotkey — body {"keys": [...]}. */
+    async browserHotkey(serialno: string, keys: readonly string[]): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('hotkey', serialno), {
         body: { keys },
       })
       return createOperationResult(data)
@@ -134,45 +134,45 @@ export function BrowserApi<TBase extends Constructor<HttpTransport>>(Base: TBase
 
     // State
 
-    /** GET /api/browser/{serial}/state — url, title, viewport, tab count. */
-    async browserState(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('GET', browserPath('state', serial))
+    /** GET /api/browser/{serialno}/state — url, title, viewport, tab count. */
+    async browserState(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('GET', browserPath('state', serialno))
       return createOperationResult(data)
     }
 
-    /** GET /api/browser/{serial}/tabs */
-    async browserTabs(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('GET', browserPath('tabs', serial))
+    /** GET /api/browser/{serialno}/tabs */
+    async browserTabs(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('GET', browserPath('tabs', serialno))
       return createOperationResult(data)
     }
 
     // Tabs
 
-    /** POST /api/browser/{serial}/tab/open — body {"url"}. */
-    async browserTabOpen(serial: string, url: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('tab/open', serial), {
+    /** POST /api/browser/{serialno}/tab/open — body {"url"}. */
+    async browserTabOpen(serialno: string, url: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('tab/open', serialno), {
         body: { url },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/tab/close — body {"tab_id"}. */
-    async browserTabClose(serial: string, tabId: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('tab/close', serial), {
+    /** POST /api/browser/{serialno}/tab/close — body {"tab_id"}. */
+    async browserTabClose(serialno: string, tabId: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('tab/close', serialno), {
         body: { tab_id: tabId },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/tab/close_all — lands on a fresh about:blank tab. */
-    async browserTabCloseAll(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('tab/close_all', serial))
+    /** POST /api/browser/{serialno}/tab/close_all — lands on a fresh about:blank tab. */
+    async browserTabCloseAll(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('tab/close_all', serialno))
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/tab/switch — body {"tab_id"}. */
-    async browserTabSwitch(serial: string, tabId: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('tab/switch', serial), {
+    /** POST /api/browser/{serialno}/tab/switch — body {"tab_id"}. */
+    async browserTabSwitch(serialno: string, tabId: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('tab/switch', serialno), {
         body: { tab_id: tabId },
       })
       return createOperationResult(data)
@@ -180,15 +180,15 @@ export function BrowserApi<TBase extends Constructor<HttpTransport>>(Base: TBase
 
     // Lifecycle
 
-    /** POST /api/browser/{serial}/launch — start CDP; returns a connectable CDP URL. */
-    async browserLaunch(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('launch', serial))
+    /** POST /api/browser/{serialno}/launch — start CDP; returns a connectable CDP URL. */
+    async browserLaunch(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('launch', serialno))
       return createOperationResult(data)
     }
 
-    /** POST /api/browser/{serial}/close — stop CDP (the pooled entry is reused next time). */
-    async browserClose(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', browserPath('close', serial))
+    /** POST /api/browser/{serialno}/close — stop CDP (the pooled entry is reused next time). */
+    async browserClose(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', browserPath('close', serialno))
       return createOperationResult(data)
     }
   }

@@ -12,18 +12,18 @@ import { createOperationResult } from '../models.js'
 /**
  * Computer platform API (macOS / Windows / Linux desktops).
  *
- * Path template: `POST/GET /api/computer/{serial}/{action}`. Contract mirrors
+ * Path template: `POST/GET /api/computer/{serialno}/{action}`. Contract mirrors
  * the Go CLI's `internal/api/computer.go` (single source of truth:
  * `computer-control.ts`).
  *
  * GET actions (position/screen_size/permissions) carry no body. Coordinates are
- * absolute screen pixels. The serial is the platform `serialno` of a registered
+ * absolute screen pixels. The serialno is the platform `serialno` of a registered
  * computer device, as listed by `listDevices({ type: 'computer' })`.
  */
 
-/** Build `/api/computer/{serial}/{action}`. */
-export function computerPath(action: string, serial: string): string {
-  return `/api/computer/${encodeURIComponent(serial)}/${action}`
+/** Build `/api/computer/{serialno}/{action}`. */
+export function computerPath(action: string, serialno: string): string {
+  return `/api/computer/${encodeURIComponent(serialno)}/${action}`
 }
 
 /** Mirrors the server's own default (and the agent Bash tool's). */
@@ -58,53 +58,53 @@ export function ComputerApi<TBase extends Constructor<HttpTransport>>(Base: TBas
   return class ComputerApiMixin extends Base {
     // Mouse
 
-    /** POST /api/computer/{serial}/click — body {"x","y","button"?}. Omitted button ⇒ "left". */
+    /** POST /api/computer/{serialno}/click — body {"x","y","button"?}. Omitted button ⇒ "left". */
     async computerClick(
-      serial: string,
+      serialno: string,
       request: ComputerClickRequest,
     ): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('click', serial), {
+      const data = await this.requestJson('POST', computerPath('click', serialno), {
         body: { x: request.x, y: request.y, button: request.button },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/double_click — body {"x","y"} (left button). */
+    /** POST /api/computer/{serialno}/double_click — body {"x","y"} (left button). */
     async computerDoubleClick(
-      serial: string,
+      serialno: string,
       request: ComputerPointRequest,
     ): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('double_click', serial), {
+      const data = await this.requestJson('POST', computerPath('double_click', serialno), {
         body: { x: request.x, y: request.y },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/long_click — body {"x","y","duration"?} in seconds. */
+    /** POST /api/computer/{serialno}/long_click — body {"x","y","duration"?} in seconds. */
     async computerLongClick(
-      serial: string,
+      serialno: string,
       request: ComputerLongClickRequest,
     ): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('long_click', serial), {
+      const data = await this.requestJson('POST', computerPath('long_click', serialno), {
         body: { x: request.x, y: request.y, duration: request.duration },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/move — body {"x","y"}. */
+    /** POST /api/computer/{serialno}/move — body {"x","y"}. */
     async computerMove(
-      serial: string,
+      serialno: string,
       request: ComputerPointRequest,
     ): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('move', serial), {
+      const data = await this.requestJson('POST', computerPath('move', serialno), {
         body: { x: request.x, y: request.y },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/drag — body {"x1","y1","x2","y2"}. */
-    async computerDrag(serial: string, bounds: Bounds): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('drag', serial), {
+    /** POST /api/computer/{serialno}/drag — body {"x1","y1","x2","y2"}. */
+    async computerDrag(serialno: string, bounds: Bounds): Promise<OperationResult> {
+      const data = await this.requestJson('POST', computerPath('drag', serialno), {
         body: {
           x1: bounds.x1,
           y1: bounds.y1,
@@ -115,13 +115,13 @@ export function ComputerApi<TBase extends Constructor<HttpTransport>>(Base: TBas
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/scroll — body {"direction","amount"?}. */
+    /** POST /api/computer/{serialno}/scroll — body {"direction","amount"?}. */
     async computerScroll(
-      serial: string,
+      serialno: string,
       direction: ScrollDirection,
       amount?: number,
     ): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('scroll', serial), {
+      const data = await this.requestJson('POST', computerPath('scroll', serialno), {
         body: { direction, amount },
       })
       return createOperationResult(data)
@@ -129,25 +129,25 @@ export function ComputerApi<TBase extends Constructor<HttpTransport>>(Base: TBas
 
     // Keyboard
 
-    /** POST /api/computer/{serial}/type_text — body {"text"}. */
-    async computerTypeText(serial: string, text: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('type_text', serial), {
+    /** POST /api/computer/{serialno}/type_text — body {"text"}. */
+    async computerTypeText(serialno: string, text: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', computerPath('type_text', serialno), {
         body: { text },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/press — body {"key"}. */
-    async computerPress(serial: string, key: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('press', serial), {
+    /** POST /api/computer/{serialno}/press — body {"key"}. */
+    async computerPress(serialno: string, key: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', computerPath('press', serialno), {
         body: { key },
       })
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/hotkey — body {"keys": [...]}. */
-    async computerHotkey(serial: string, keys: readonly string[]): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('hotkey', serial), {
+    /** POST /api/computer/{serialno}/hotkey — body {"keys": [...]}. */
+    async computerHotkey(serialno: string, keys: readonly string[]): Promise<OperationResult> {
+      const data = await this.requestJson('POST', computerPath('hotkey', serialno), {
         body: { keys },
       })
       return createOperationResult(data)
@@ -155,27 +155,27 @@ export function ComputerApi<TBase extends Constructor<HttpTransport>>(Base: TBas
 
     // System
 
-    /** GET /api/computer/{serial}/position — absolute mouse position. */
-    async computerPosition(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('GET', computerPath('position', serial))
+    /** GET /api/computer/{serialno}/position — absolute mouse position. */
+    async computerPosition(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('GET', computerPath('position', serialno))
       return createOperationResult(data)
     }
 
-    /** GET /api/computer/{serial}/screen_size — primary screen in pixels. */
-    async computerScreenSize(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('GET', computerPath('screen_size', serial))
+    /** GET /api/computer/{serialno}/screen_size — primary screen in pixels. */
+    async computerScreenSize(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('GET', computerPath('screen_size', serialno))
       return createOperationResult(data)
     }
 
-    /** GET /api/computer/{serial}/permissions — screen recording, accessibility, … */
-    async computerPermissions(serial: string): Promise<OperationResult> {
-      const data = await this.requestJson('GET', computerPath('permissions', serial))
+    /** GET /api/computer/{serialno}/permissions — screen recording, accessibility, … */
+    async computerPermissions(serialno: string): Promise<OperationResult> {
+      const data = await this.requestJson('GET', computerPath('permissions', serialno))
       return createOperationResult(data)
     }
 
-    /** POST /api/computer/{serial}/launch_app — body {"app_name"}. */
-    async computerLaunchApp(serial: string, appName: string): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('launch_app', serial), {
+    /** POST /api/computer/{serialno}/launch_app — body {"app_name"}. */
+    async computerLaunchApp(serialno: string, appName: string): Promise<OperationResult> {
+      const data = await this.requestJson('POST', computerPath('launch_app', serialno), {
         body: { app_name: appName },
       })
       return createOperationResult(data)
@@ -184,13 +184,13 @@ export function ComputerApi<TBase extends Constructor<HttpTransport>>(Base: TBas
     // Blocking actions
 
     /**
-     * POST /api/computer/{serial}/wait — body {"seconds": ms/1000}.
+     * POST /api/computer/{serialno}/wait — body {"seconds": ms/1000}.
      *
      * The CLI takes milliseconds; the API field is seconds. The transport
      * deadline is widened to cover the wait itself.
      */
-    async computerWait(serial: string, milliseconds: number): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('wait', serial), {
+    async computerWait(serialno: string, milliseconds: number): Promise<OperationResult> {
+      const data = await this.requestJson('POST', computerPath('wait', serialno), {
         body: { seconds: milliseconds / 1000 },
         timeout: waitTimeoutMs(milliseconds),
       })
@@ -198,7 +198,7 @@ export function ComputerApi<TBase extends Constructor<HttpTransport>>(Base: TBas
     }
 
     /**
-     * POST /api/computer/{serial}/bash — body {"command","timeout"?} with the
+     * POST /api/computer/{serialno}/bash — body {"command","timeout"?} with the
      * timeout in seconds (omitted when zero so the server applies its 120s
      * default).
      *
@@ -206,11 +206,11 @@ export function ComputerApi<TBase extends Constructor<HttpTransport>>(Base: TBas
      * — a non-zero value is not an API error, so this does not reject for it.
      */
     async computerBash(
-      serial: string,
+      serialno: string,
       command: string,
       timeoutSeconds = 0,
     ): Promise<OperationResult> {
-      const data = await this.requestJson('POST', computerPath('bash', serial), {
+      const data = await this.requestJson('POST', computerPath('bash', serialno), {
         body: { command, timeout: timeoutSeconds || undefined },
         timeout: bashTimeoutMs(timeoutSeconds),
       })

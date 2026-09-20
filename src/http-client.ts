@@ -21,9 +21,9 @@ export type { HttpClientConfig } from './transport.js'
  * Each platform lives in its own module under `./api`, so this file only wires
  * them together:
  *
- * - `mobile`   — Android / HarmonyOS / iOS over `/v1/{action}/{serial}`
- * - `browser`  — Chrome/Chromium/Edge over `/api/browser/{serial}/{action}`
- * - `computer` — desktop control over `/api/computer/{serial}/{action}`
+ * - `mobile`   — Android / HarmonyOS / iOS over `/v1/{action}/{serialno}`
+ * - `browser`  — Chrome/Chromium/Edge over `/api/browser/{serialno}/{action}`
+ * - `computer` — desktop control over `/api/computer/{serialno}/{action}`
  * - `device`   — `listDevices`
  *
  * Every method takes the device serialno as its first argument; see the Go CLI

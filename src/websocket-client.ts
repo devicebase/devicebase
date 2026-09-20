@@ -13,7 +13,7 @@ function toWsUrl(baseUrl: string): string {
 
 export interface WebSocketClientConfig {
   baseUrl: string
-  serial: string
+  serialno: string
   apiKey?: string
 }
 
@@ -31,7 +31,7 @@ export class MinicapClient {
       )
     }
     this.apiKey = apiKey
-    this.url = `${toWsUrl(config.baseUrl)}/v1/minicap/${config.serial}`
+    this.url = `${toWsUrl(config.baseUrl)}/v1/minicap/${config.serialno}`
   }
 
   async* streamFrames(): AsyncGenerator<Buffer> {
@@ -95,7 +95,7 @@ export class MinitouchClient {
       )
     }
     this.apiKey = apiKey
-    this.url = `${toWsUrl(config.baseUrl)}/v1/minitouch/${config.serial}`
+    this.url = `${toWsUrl(config.baseUrl)}/v1/minitouch/${config.serialno}`
   }
 
   async connect(): Promise<void> {

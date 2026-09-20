@@ -15,7 +15,7 @@ export const BROWSER_GROUP = 'browser'
  * Browser platform group (Chrome/Chromium/Edge over CDP).
  *
  * Every action targets `POST/GET /api/browser/{serialno}/{action...}`. The
- * serial is the platform `serialno` of a registered browser device — see
+ * serialno is the platform `serialno` of a registered browser device — see
  * `devicebase list-devices --type browser`.
  */
 export function createBrowserCommand(): Command {
