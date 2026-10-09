@@ -1,5 +1,6 @@
 import type { OptionValues } from 'commander'
 import { Command } from 'commander'
+import { createCloudBrowserCommands } from './cloud-browser.js'
 import {
   createClient,
   printEnvelope,
@@ -14,9 +15,12 @@ export const BROWSER_GROUP = 'browser'
 /**
  * Browser platform group (Chrome/Chromium/Edge over CDP).
  *
- * Every action targets `POST/GET /api/browser/{serialno}/{action...}`. The
- * serialno is the platform `serialno` of a registered browser device — see
+ * Every device action targets `POST/GET /api/browser/{serialno}/{action...}`.
+ * The serialno is the platform `serialno` of a registered browser device — see
  * `devicebase list-devices --type browser`.
+ *
+ * `create`/`delete`/`status`/`quota` are the exception: they build and destroy
+ * a cloud browser through `/v1/browser/*` and take no `-s`.
  */
 export function createBrowserCommand(): Command {
   const group = new Command(BROWSER_GROUP)
@@ -158,6 +162,8 @@ export function createBrowserCommand(): Command {
       .action(async (_options: OptionValues, cmd: Command) => {
         printEnvelope(await createClient().browserClose(resolveSerial(cmd, BROWSER_GROUP)))
       }),
+    // Cloud browser lifecycle: /v1/browser/*, none of them takes -s.
+    ...createCloudBrowserCommands(),
     createScreenshotCommand(BROWSER_GROUP),
   ]
 

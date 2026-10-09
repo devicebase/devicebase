@@ -151,6 +151,13 @@ const BROWSER_ROWS: WireRow[] = [
   { argv: ['browser', '-s', 'br-uuid', 'tab-switch', 'tab-2'], expected: { path: '/api/browser/br-uuid/tab/switch', method: 'POST', body: { tab_id: 'tab-2' } } },
   { argv: ['browser', '-s', 'br-uuid', 'launch'], expected: { path: '/api/browser/br-uuid/launch', method: 'POST' } },
   { argv: ['browser', '-s', 'br-uuid', 'close'], expected: { path: '/api/browser/br-uuid/close', method: 'POST' } },
+  // Cloud browser lifecycle: /v1/browser/*, and no -s anywhere — create has no
+  // device yet, the other three take the identifier as an argument.
+  { argv: ['browser', 'create'], expected: { path: '/v1/browser/create', method: 'POST', body: {} } },
+  { argv: ['browser', 'create', '--name', 'my-browser', '--window-size', '1366x768', '--wait', '30'], expected: { path: '/v1/browser/create', method: 'POST', body: { name: 'my-browser', window_size: '1366x768', wait_seconds: 30 } } },
+  { argv: ['browser', 'delete', 'db-mtabc123'], expected: { path: '/v1/browser/db-mtabc123', method: 'DELETE' } },
+  { argv: ['browser', 'status', '3f2a-uuid'], expected: { path: '/v1/browser/3f2a-uuid/status', method: 'GET' } },
+  { argv: ['browser', 'quota'], expected: { path: '/v1/browser/quota', method: 'GET' } },
   { argv: ['browser', '-s', 'br-uuid', 'screenshot'], expected: { path: '/v1/screen/br-uuid', method: 'POST' } },
 ]
 
@@ -233,7 +240,7 @@ describe('devicebase CLI command tree', () => {
     ])
   })
 
-  it('exposes the full browser command set (22)', () => {
+  it('exposes the full browser command set (26)', () => {
     const names = createBrowserCommand().commands.map(c => c.name())
     expect(names).toEqual([
       'navigate',
@@ -257,6 +264,11 @@ describe('devicebase CLI command tree', () => {
       'tab-switch',
       'launch',
       'close',
+      // Cloud browser lifecycle — the only browser commands without -s.
+      'create',
+      'delete',
+      'status',
+      'quota',
       'screenshot',
     ])
   })

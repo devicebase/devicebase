@@ -59,6 +59,7 @@ devicebase
 ├── list-devices                 # device discovery (no -s required)
 ├── mobile ...                   # Android / HarmonyOS / iOS  — /v1/{action}/{serialno}
 ├── browser ...                  # Chrome / Chromium / Edge   — /api/browser/{serialno}/{action}
+│   └── create · delete · status · quota   # cloud browser lifecycle (no -s)
 └── computer ...                 # Desktop                    — /api/computer/{serialno}/{action}
 ```
 
@@ -199,6 +200,32 @@ npx devicebase browser -s <serialno> tabs
 npx devicebase browser -s <serialno> execute "document.title"
 ```
 
+**Cloud browser lifecycle** — the four commands that take no `-s`. They build and destroy a browser the platform runs for you, over `/v1/browser/*` (whereas `close` above only stops the CDP engine of a browser you still have):
+
+| Command | Description |
+| ------- | ----------- |
+| `create [--name N] [--window-size WxH] [--wait S]` | Ask the platform for a new cloud browser. It picks the machine; you are not told which one. Always headless — there is no flag for that |
+| `status <serial>` | Whether it has registered yet, and under which `serialno` |
+| `quota` | How many cloud browsers the account may still create |
+| `delete <serialno>` | Destroy a cloud browser and its profile — **irreversible** |
+
+```bash
+npx devicebase browser quota                        # room left, asked before creating
+npx devicebase browser create --name my-browser     # → {"serialno":"db-…","alias_name":"my-browser","registered":true}
+npx devicebase browser -s db-mtabc123 navigate https://example.com
+npx devicebase browser delete db-mtabc123           # done with it
+```
+
+Creation is asynchronous — the browser has to start and register itself — so
+`create` waits for that (15s by default, `--wait 0`…`--wait 60`) and prints the
+`serialno` you drive it with, plus `alias_name` — the `--name` you gave, verbatim.
+(The `name` field is the platform's own identity for the machine, not your name
+for it.) If it has not come up within the wait the command
+still succeeds: `registered: false`, `serialno: null`, plus a `device_sn` for
+`npx devicebase browser status`. A browser you attached yourself is not a cloud
+browser: it does not count against the quota and cannot be deleted here
+(`list-devices` reports `is_cloud`).
+
 ### Computer platform (`npx devicebase computer -s <serialno> …`)
 
 Serial: the computer device's `serialno` from `list-devices --type computer`. Endpoints: `POST/GET /api/computer/{serialno}/{action}`. Coordinates are absolute screen pixels (`x,y` / `x1,y1,x2,y2`).
@@ -327,11 +354,14 @@ const { data } = await client.listDevices({ type: 'browser', state: 'free' })
 
 ### `DeviceBaseHttpClient`
 
-Every method takes the device serialno first. Grouped by platform:
+Every device-action method takes the device serialno first. Grouped by platform
+— the two account-level groups (`Device`, `Cloud browser`) take no serialno at
+all, since they are not about one device:
 
 | Platform | Methods |
 | -------- | ------- |
 | Device | `listDevices({ keyword?, state?, type?, limit? })` |
+| Cloud browser | `cloudBrowserCreate({ name?, windowSize?, waitSeconds? })`, `cloudBrowserDelete(identifier)`, `cloudBrowserStatus(identifier)`, `cloudBrowserQuota()` |
 | Mobile | `getDeviceInfo`, `tap`, `doubleTap`, `longPress`, `swipe`, `back`, `home`, `launchApp`, `stopApp`, `stopCurrentApp`, `getCurrentApp`, `inputText`, `clearText`, `bash`, `dumpHierarchy`, `installApp`, `installStatus`, `getScreenshot` |
 | Browser | `browserNavigate`, `browserRefresh`, `browserGoBack`, `browserGoForward`, `browserInput`, `browserClick`, `browserFill`, `browserSelect`, `browserText`, `browserAttribute`, `browserExists`, `browserExecute`, `browserHotkey`, `browserState`, `browserTabs`, `browserTabOpen`, `browserTabClose`, `browserTabCloseAll`, `browserTabSwitch`, `browserLaunch`, `browserClose` |
 | Computer | `computerClick`, `computerDoubleClick`, `computerLongClick`, `computerMove`, `computerDrag`, `computerScroll`, `computerTypeText`, `computerPress`, `computerHotkey`, `computerPosition`, `computerScreenSize`, `computerPermissions`, `computerLaunchApp`, `computerWait`, `computerBash` |

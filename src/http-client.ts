@@ -1,4 +1,5 @@
 import { BrowserApi } from './api/browser.js'
+import { CloudBrowserApi } from './api/cloud-browser.js'
 import { ComputerApi } from './api/computer.js'
 import { DeviceApi } from './api/device.js'
 import { MobileApi } from './api/mobile.js'
@@ -21,14 +22,18 @@ export type { HttpClientConfig } from './transport.js'
  * Each platform lives in its own module under `./api`, so this file only wires
  * them together:
  *
- * - `mobile`   — Android / HarmonyOS / iOS over `/v1/{action}/{serialno}`
- * - `browser`  — Chrome/Chromium/Edge over `/api/browser/{serialno}/{action}`
- * - `computer` — desktop control over `/api/computer/{serialno}/{action}`
- * - `device`   — `listDevices`
+ * - `mobile`        — Android / HarmonyOS / iOS over `/v1/{action}/{serialno}`
+ * - `browser`       — Chrome/Chromium/Edge over `/api/browser/{serialno}/{action}`
+ * - `computer`      — desktop control over `/api/computer/{serialno}/{action}`
+ * - `device`        — `listDevices`
+ * - `cloud-browser` — cloud browser lifecycle over `/v1/browser/*` (create,
+ *   delete, status, quota)
  *
- * Every method takes the device serialno as its first argument; see the Go CLI
- * (`internal/api`) for the contract each one encodes.
+ * Every device-action method takes the device serialno as its first argument.
+ * The two account-level groups — `device` and `cloud-browser` — do not belong
+ * to a device and take no serialno at all; see the Go CLI (`internal/api`) for
+ * the contract each method encodes.
  */
 export class DeviceBaseHttpClient extends ComputerApi(
-  BrowserApi(MobileApi(DeviceApi(HttpTransport))),
+  CloudBrowserApi(BrowserApi(MobileApi(DeviceApi(HttpTransport)))),
 ) {}

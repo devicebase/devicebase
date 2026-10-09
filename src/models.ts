@@ -162,6 +162,27 @@ export interface ListDevicesRequest {
   readonly limit?: number
 }
 
+/**
+ * Cloud browser creation parameters — every field is optional.
+ *
+ * The platform picks the machine itself, so nothing here chooses a node:
+ * `name` is only the label shown in the device list (the server applies its own
+ * naming rule when it is empty; max 100 characters), and `windowSize` is the
+ * `1366x768` shape the node parses.
+ *
+ * There is no `headless`: a cloud browser always runs headless (it lives on a
+ * machine nobody is looking at), and the platform pins that itself.
+ *
+ * `waitSeconds` is how long the platform waits for the browser to register
+ * before answering — 0 to 60, and 0 answers immediately. Left out, the server
+ * waits its default of 15.
+ */
+export interface CreateCloudBrowserRequest {
+  readonly name?: string
+  readonly windowSize?: string
+  readonly waitSeconds?: number
+}
+
 // --- Factories ------------------------------------------------------------
 
 export function createPoint(x: number, y: number): Point {

@@ -136,10 +136,46 @@ describe('deviceBaseHttpClient', () => {
         'computerBash',
         // device
         'listDevices',
+        // cloud browser lifecycle
+        'cloudBrowserCreate',
+        'cloudBrowserDelete',
+        'cloudBrowserStatus',
+        'cloudBrowserQuota',
       ] as const
       for (const method of methods) {
         expect(typeof (client as unknown as Record<string, unknown>)[method]).toBe('function')
       }
+    })
+
+    it('sends the cloud browser lifecycle to /v1/browser/*, not into the device-action family', async () => {
+      globalThis.fetch = jsonFetch()
+
+      await client.cloudBrowserCreate({ name: 'my-browser', windowSize: '1366x768', waitSeconds: 30 })
+      expect(lastCall()[0]).toBe(`${BASE_URL}/v1/browser/create`)
+      expect(lastCall()[1]?.method).toBe('POST')
+      // windowSize/waitSeconds are camelCase in the SDK and snake_case on the wire.
+      expect(JSON.parse(String(lastCall()[1]?.body))).toEqual({
+        name: 'my-browser',
+        window_size: '1366x768',
+        wait_seconds: 30,
+      })
+
+      // Fields that were not given stay out of the body; the mode is not a
+      // field at all (a cloud browser is always headless).
+      await client.cloudBrowserCreate()
+      expect(JSON.parse(String(lastCall()[1]?.body))).toEqual({})
+
+      await client.cloudBrowserDelete('db-mtabc123')
+      expect(lastCall()[0]).toBe(`${BASE_URL}/v1/browser/db-mtabc123`)
+      expect(lastCall()[1]?.method).toBe('DELETE')
+
+      await client.cloudBrowserStatus('3f2a-uuid')
+      expect(lastCall()[0]).toBe(`${BASE_URL}/v1/browser/3f2a-uuid/status`)
+      expect(lastCall()[1]?.method).toBe('GET')
+
+      await client.cloudBrowserQuota()
+      expect(lastCall()[0]).toBe(`${BASE_URL}/v1/browser/quota`)
+      expect(lastCall()[1]?.method).toBe('GET')
     })
   })
 

@@ -17,6 +17,7 @@ export type {
   ComputerClickRequest,
   ComputerLongClickRequest,
   ComputerPointRequest,
+  CreateCloudBrowserRequest,
   DeviceInfo,
   HierarchyInfo,
   InputTextRequest,
