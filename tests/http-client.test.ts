@@ -141,6 +141,9 @@ describe('deviceBaseHttpClient', () => {
         'cloudBrowserDelete',
         'cloudBrowserStatus',
         'cloudBrowserQuota',
+        // the account itself
+        'userInfo',
+        'userCheckin',
       ] as const
       for (const method of methods) {
         expect(typeof (client as unknown as Record<string, unknown>)[method]).toBe('function')
@@ -176,6 +179,21 @@ describe('deviceBaseHttpClient', () => {
       await client.cloudBrowserQuota()
       expect(lastCall()[0]).toBe(`${BASE_URL}/v1/browser/quota`)
       expect(lastCall()[1]?.method).toBe('GET')
+    })
+
+    it('sends the account calls to /v1/user/*, with an empty object as the check-in body', async () => {
+      globalThis.fetch = jsonFetch()
+
+      await client.userInfo()
+      expect(lastCall()[0]).toBe(`${BASE_URL}/v1/user/info`)
+      expect(lastCall()[1]?.method).toBe('GET')
+
+      await client.userCheckin()
+      expect(lastCall()[0]).toBe(`${BASE_URL}/v1/user/checkin`)
+      expect(lastCall()[1]?.method).toBe('POST')
+      // 空对象而不是没有请求体：签到没有参数，而 {} 在还没有体为空这一容忍度的
+      // 部署上也照样被接受（传输层总会带上 content-type: application/json）。
+      expect(JSON.parse(String(lastCall()[1]?.body))).toEqual({})
     })
   })
 

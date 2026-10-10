@@ -7,6 +7,7 @@ import { createComputerCommand } from './computer.js'
 import { CliError } from './helpers.js'
 import { createListDevicesCommand } from './list-devices.js'
 import { createMobileCommand } from './mobile.js'
+import { createUserCommand } from './user.js'
 
 /**
  * Root command tree:
@@ -15,6 +16,7 @@ import { createMobileCommand } from './mobile.js'
  *   devicebase mobile    -s <serialno>   Android / HarmonyOS / iOS — /v1/{action}/{serialno}
  *   devicebase browser   -s <serialno>   Chrome/CDP — /api/browser/{serialno}/{action}
  *   devicebase computer  -s <serialno>   desktop — /api/computer/{serialno}/{action}
+ *   devicebase user                the account itself — /v1/user/*
  *
  * The root also declares `-s/--serialno`, bound to the same value as each
  * group's, so the flag may precede the group:
@@ -34,6 +36,7 @@ export function createCliProgram(): Command {
     createMobileCommand(),
     createBrowserCommand(),
     createComputerCommand(),
+    createUserCommand(),
   ]) {
     program.addCommand(command)
   }

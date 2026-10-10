@@ -13,6 +13,7 @@ import { readInputText } from '../src/cli/helpers.js'
 import { createCliProgram, run } from '../src/cli/index.js'
 import { LIST_DEVICES_COMMAND } from '../src/cli/list-devices.js'
 import { createMobileCommand, MOBILE_GROUP } from '../src/cli/mobile.js'
+import { createUserCommand, USER_GROUP } from '../src/cli/user.js'
 
 const API_KEY = 'test-api-key'
 const realFetch = globalThis.fetch
@@ -161,6 +162,14 @@ const BROWSER_ROWS: WireRow[] = [
   { argv: ['browser', '-s', 'br-uuid', 'screenshot'], expected: { path: '/v1/screen/br-uuid', method: 'POST' } },
 ]
 
+// The account itself: /v1/user/*, no -s and no arguments — the API key decides
+// whose account this is. checkin carries an empty object rather than no body at
+// all (see src/api/user.ts).
+const USER_ROWS: WireRow[] = [
+  { argv: ['user', 'info'], expected: { path: '/v1/user/info', method: 'GET' } },
+  { argv: ['user', 'checkin'], expected: { path: '/v1/user/checkin', method: 'POST', body: {} } },
+]
+
 const COMPUTER_ROWS: WireRow[] = [
   // No --button: the field is omitted so the server applies its own "left" default.
   { argv: ['computer', '-s', 'pc-1', 'click', '10,20'], expected: { path: '/api/computer/pc-1/click', method: 'POST', body: { x: 10, y: 20 } } },
@@ -206,14 +215,19 @@ describe('devicebase CLI command tree', () => {
     globalThis.fetch = realFetch
   })
 
-  it('registers only list-devices and the three platform groups', () => {
+  it('registers only list-devices, the three platform groups and the account group', () => {
     const names = createCliProgram().commands.map(c => c.name())
     expect(names).toEqual([
       LIST_DEVICES_COMMAND,
       MOBILE_GROUP,
       BROWSER_GROUP,
       COMPUTER_GROUP,
+      USER_GROUP,
     ])
+  })
+
+  it('exposes the account group (info, checkin)', () => {
+    expect(createUserCommand().commands.map(c => c.name())).toEqual(['info', 'checkin'])
   })
 
   it('exposes the full mobile command set (18)', () => {
@@ -321,6 +335,14 @@ describe('devicebase CLI command tree', () => {
 
     it.each(COMPUTER_ROWS.map(r => [r.argv.join(' '), r] as const))(
       'computer %s',
+      async (_label, row) => {
+        await runCli(row.argv)
+        expectRequest(lastFetch(globalThis.fetch as Mock), row.expected)
+      },
+    )
+
+    it.each(USER_ROWS.map(r => [r.argv.join(' '), r] as const))(
+      'user %s',
       async (_label, row) => {
         await runCli(row.argv)
         expectRequest(lastFetch(globalThis.fetch as Mock), row.expected)

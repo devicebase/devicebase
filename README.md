@@ -60,7 +60,8 @@ devicebase
 ├── mobile ...                   # Android / HarmonyOS / iOS  — /v1/{action}/{serialno}
 ├── browser ...                  # Chrome / Chromium / Edge   — /api/browser/{serialno}/{action}
 │   └── create · delete · status · quota   # cloud browser lifecycle (no -s)
-└── computer ...                 # Desktop                    — /api/computer/{serialno}/{action}
+├── computer ...                 # Desktop                    — /api/computer/{serialno}/{action}
+└── user                         # your account               — /v1/user/* (no -s)
 ```
 
 Run `--help` at any level for full usage, e.g. `npx devicebase --help`, `npx devicebase mobile --help`, or `npx devicebase computer click --help`.
@@ -262,6 +263,37 @@ npx devicebase computer -s <serialno> bash "ls && echo ok"
 
 `bash` (**danger tier**) runs arbitrary commands on the host machine as the desktop user, under the platform default shell (`/bin/sh` on macOS/Linux, `cmd.exe` on Windows), so bash-only syntax such as `[[ ]]` may not work. Quote the command so the CLI does not parse its flags. `--timeout` is in **seconds** (default 120) — note that `wait` takes **milliseconds**. A non-zero command exit is reported in `data.exitCode`; the CLI still exits `0` because the API call succeeded.
 
+### Your account (`npx devicebase user …`)
+
+The account behind `DEVICEBASE_API_KEY` — no device involved, and no `-s`: the
+key already identifies the account, and it can only ever be your own. Endpoints:
+`GET /v1/user/info`, `POST /v1/user/checkin`.
+
+| Command | Description |
+| ------- | ----------- |
+| `info` | `username`, `mobile`, `credits` (积分 balance), `registered_at`, `can_checkin` |
+| `checkin` | Claim the daily points — once per day |
+
+```bash
+npx devicebase user info
+# {"data":{"id":42,"username":"richie","mobile":"13800138000","credits":1259,
+#          "registered_at":"2026-01-02T03:04:05","can_checkin":true}}
+
+npx devicebase user checkin
+# {"data":{"success":true,"credits_earned":25,"consecutive_days":1,
+#          "already_checked":false,"message":"签到成功！获得25积分","credits":1284}}
+```
+
+Points: 25 on the first day, +10 per consecutive day, up to 95 a day. Running
+`checkin` twice the same day is **not an error** — the second call answers
+`already_checked: true` with `message: "今日已签到"` and grants nothing, so a
+daily scheduled task can run it unconditionally:
+
+```bash
+# crontab -e — 09:07 every day
+7 9 * * * DEVICEBASE_API_KEY=sk-… npx devicebase user checkin >> ~/checkin.log 2>&1
+```
+
 ### Screenshot (cross-family)
 
 `screenshot` is the one **cross-family** command: it does not live under `/api/browser/*` or `/api/computer/*`. The server dispatches `POST /v1/screen/{serialno}` by device type — computer → full-desktop capture, browser → CDP capture, otherwise the device image queue — so one command serves every platform and is registered in each group so `--help` surfaces it.
@@ -355,13 +387,14 @@ const { data } = await client.listDevices({ type: 'browser', state: 'free' })
 ### `DeviceBaseHttpClient`
 
 Every device-action method takes the device serialno first. Grouped by platform
-— the two account-level groups (`Device`, `Cloud browser`) take no serialno at
-all, since they are not about one device:
+— the three account-level groups (`Device`, `Cloud browser`, `User`) take no
+serialno at all, since they are not about one device:
 
 | Platform | Methods |
 | -------- | ------- |
 | Device | `listDevices({ keyword?, state?, type?, limit? })` |
 | Cloud browser | `cloudBrowserCreate({ name?, windowSize?, waitSeconds? })`, `cloudBrowserDelete(identifier)`, `cloudBrowserStatus(identifier)`, `cloudBrowserQuota()` |
+| User | `userInfo()`, `userCheckin()` |
 | Mobile | `getDeviceInfo`, `tap`, `doubleTap`, `longPress`, `swipe`, `back`, `home`, `launchApp`, `stopApp`, `stopCurrentApp`, `getCurrentApp`, `inputText`, `clearText`, `bash`, `dumpHierarchy`, `installApp`, `installStatus`, `getScreenshot` |
 | Browser | `browserNavigate`, `browserRefresh`, `browserGoBack`, `browserGoForward`, `browserInput`, `browserClick`, `browserFill`, `browserSelect`, `browserText`, `browserAttribute`, `browserExists`, `browserExecute`, `browserHotkey`, `browserState`, `browserTabs`, `browserTabOpen`, `browserTabClose`, `browserTabCloseAll`, `browserTabSwitch`, `browserLaunch`, `browserClose` |
 | Computer | `computerClick`, `computerDoubleClick`, `computerLongClick`, `computerMove`, `computerDrag`, `computerScroll`, `computerTypeText`, `computerPress`, `computerHotkey`, `computerPosition`, `computerScreenSize`, `computerPermissions`, `computerLaunchApp`, `computerWait`, `computerBash` |

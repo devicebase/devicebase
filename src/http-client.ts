@@ -3,6 +3,7 @@ import { CloudBrowserApi } from './api/cloud-browser.js'
 import { ComputerApi } from './api/computer.js'
 import { DeviceApi } from './api/device.js'
 import { MobileApi } from './api/mobile.js'
+import { UserApi } from './api/user.js'
 import { HttpTransport } from './transport.js'
 
 export {
@@ -28,12 +29,13 @@ export type { HttpClientConfig } from './transport.js'
  * - `device`        — `listDevices`
  * - `cloud-browser` — cloud browser lifecycle over `/v1/browser/*` (create,
  *   delete, status, quota)
+ * - `user`          — the account itself over `/v1/user/*` (info, checkin)
  *
  * Every device-action method takes the device serialno as its first argument.
- * The two account-level groups — `device` and `cloud-browser` — do not belong
- * to a device and take no serialno at all; see the Go CLI (`internal/api`) for
- * the contract each method encodes.
+ * The three account-level groups — `device`, `cloud-browser` and `user` — do not
+ * belong to a device and take no serialno at all; see the Go CLI
+ * (`internal/api`) for the contract each method encodes.
  */
 export class DeviceBaseHttpClient extends ComputerApi(
-  CloudBrowserApi(BrowserApi(MobileApi(DeviceApi(HttpTransport)))),
+  UserApi(CloudBrowserApi(BrowserApi(MobileApi(DeviceApi(HttpTransport))))),
 ) {}
